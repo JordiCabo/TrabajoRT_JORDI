@@ -1,0 +1,25 @@
+# Autores del Proyecto PL7
+
+## Autor Principal
+**Jordi**
+- Estudiante de Sistemas en Tiempo Real
+- Desarrollo del proyecto completo
+- Diseño de arquitectura y implementación
+
+## Herramientas de Asistencia
+**GitHub Copilot**
+- Asistencia en generación de código
+- Sugerencias de implementación
+- Documentación y comentarios
+
+## Proyecto
+- **Tipo**: Trabajo Final
+- **Asignatura**: Sistemas en Tiempo Real
+- **Fecha**: Diciembre 2024
+- **Lenguaje**: C++17
+- **Framework GUI**: Qt6
+
+## Agradecimientos
+- Profesores de la asignatura Sistemas en Tiempo Real
+- Comunidad de Qt y C++
+- Documentación de POSIX threads y message queues

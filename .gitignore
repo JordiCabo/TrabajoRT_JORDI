@@ -1,0 +1,157 @@
+# .gitignore - PL7 Control de Sistemas Discretos
+
+# ==============================================================================
+# DIRECTORIOS DE BUILD
+# ==============================================================================
+build/
+bin/
+lib/*.a
+*.o
+*.so
+*.dylib
+
+# Build de CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Build de Qt
+moc_*.cpp
+moc_*.h
+ui_*.h
+qrc_*.cpp
+*_autogen/
+
+# ==============================================================================
+# EJECUTABLES
+# ==============================================================================
+# Ejecutables de test (excepto algunos scripts)
+bin/test*
+bin/control_simulator
+bin/gui_app
+bin/test_send
+bin/test_receive
+
+# ==============================================================================
+# ARCHIVOS INTERMEDIOS
+# ==============================================================================
+*.d
+*.gcda
+*.gcno
+*.gcov
+
+# ==============================================================================
+# ARCHIVOS DE SALIDA
+# ==============================================================================
+# Muestras de test (CSV/TSV)
+test/*.csv
+test/*.tsv
+test/*.txt
+test/*.dat
+test/*.png
+
+# Logs
+*.log
+
+# ==============================================================================
+# DOCUMENTACIÓN GENERADA
+# ==============================================================================
+doc/doxygen/html/
+doc/doxygen/latex/
+doc/doxygen/xml/
+*.dox
+
+# ==============================================================================
+# IDEs Y EDITORES
+# ==============================================================================
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# CLion
+.idea/
+cmake-build-*/
+
+# Qt Creator
+*.user
+*.user.*
+*.autosave
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# ==============================================================================
+# SISTEMA OPERATIVO
+# ==============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==============================================================================
+# TEMPORALES Y BACKUPS
+# ==============================================================================
+*.bak
+*.tmp
+*.temp
+*.old
+*.orig
+
+# ==============================================================================
+# IPC (Message Queues)
+# ==============================================================================
+# Las colas de mensajes POSIX están en /dev/mqueue/ (no se versionan)
+
+# ==============================================================================
+# DEPENDENCIAS
+# ==============================================================================
+# No ignoramos lib/*.a externos que se incluyan intencionalmente
+
+# ==============================================================================
+# OTROS
+# ==============================================================================
+# Archivos de compresión
+*.zip
+*.tar.gz
+*.rar
+
+# Core dumps
+core
+core.*
+
+# Valgrind
+*.valgrind
+vgcore.*
+
+# Cobertura
+*.gcov
+*.lcov
+coverage/

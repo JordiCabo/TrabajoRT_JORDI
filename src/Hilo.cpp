@@ -1,0 +1,94 @@
+/**
+ * @file Hilo.cpp
+ * @brief Implementación del wrapper de threading para sistemas discretos
+ * @author Jordi + GitHub Copilot
+ * @date 2025-12-18
+ */
+
+#include "Hilo.h"
+
+namespace DiscreteSystems {
+
+/**
+ * @brief Constructor que crea e inicia el hilo pthread
+ * 
+ * Crea un nuevo hilo pthread que ejecutará la función threadFunc,
+ * iniciando la simulación del sistema a la frecuencia especificada.
+ */
+Hilo::Hilo(DiscreteSystem* system, double* input, double* output, bool* running,std::mutex* mtx, double frequency)
+    : system_(system), input_(input), output_(output), mtx_(mtx), frequency_(frequency),running_(running)  
+{
+    pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
+}
+
+/**
+ * @brief Destructor que espera a que termine el hilo
+ * 
+ * Ejecuta pthread_join() para asegurar que el hilo finaliza
+ * correctamente antes de destruir el objeto Hilo.
+ */
+Hilo::~Hilo() {
+    pthread_join(thread_, nullptr);
+}
+
+/**
+ * @brief Función estática de punto de entrada del hilo pthread
+ * 
+ * @param arg Puntero a this (el objeto Hilo)
+ * @return nullptr
+ * 
+ * Esta función es llamada por pthread; castea el argumento a Hilo*
+ * y invoca el método privado run().
+ */
+void* Hilo::threadFunc(void* arg) {
+    Hilo* self = static_cast<Hilo*>(arg);
+    self->run();
+    return nullptr;
+}
+
+/**
+ * @brief Loop principal de ejecución del hilo a frecuencia fija
+ * 
+ * Ejecuta el sistema en bucle a la frecuencia especificada mientras
+ * la variable *running_ sea true. Sincroniza entrada y salida mediante
+ * el mutex para evitar condiciones de carrera.
+ * 
+ * @invariant Período de ejecución = 1/frequency_ segundos
+ * @invariant Acceso a *input_, *output_ y *running_ solo dentro de lock_guard
+ */
+void Hilo::run() {
+    int sleep_us = static_cast<int>(1e6 / frequency_); // microsegundos
+
+    while (true) {
+        bool isRunning;
+        {
+            std::lock_guard<std::mutex> lock(*mtx_);
+            isRunning = *running_;
+        }
+
+        if (!isRunning)
+            break; // salir del bucle si running_ es false
+
+        double input;
+        {
+            std::lock_guard<std::mutex> lock(*mtx_);
+            input = *input_;
+        }
+
+        double y = system_->next(input);
+
+        {
+            std::lock_guard<std::mutex> lock(*mtx_);
+            *output_ = y;
+        }
+
+
+        usleep(sleep_us);
+    }
+
+    int* retVal = new int(0);
+    pthread_exit(&retVal);
+}
+
+
+} // namespace DiscreteSystems
