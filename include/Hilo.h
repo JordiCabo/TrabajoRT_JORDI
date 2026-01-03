@@ -60,7 +60,7 @@ public:
      * @note El período de muestreo interno del sistema debe coincidir con 1/frequency
      */
     Hilo(DiscreteSystem* system, double* input, double* output, bool *running, 
-         std::mutex* mtx, double frequency=100);
+         pthread_mutex_t* mtx, double frequency=100);
 
     /**
      * @brief Obtiene el identificador del hilo pthread
@@ -80,7 +80,7 @@ private:
     DiscreteSystem* system_;    ///< Puntero al sistema a ejecutar
     double* input_;             ///< Puntero a variable de entrada compartida
     double* output_;            ///< Puntero a variable de salida compartida
-    std::mutex* mtx_;           ///< Puntero al mutex para sincronización
+    pthread_mutex_t* mtx_;           ///< Puntero al mutex POSIX para sincronización
     int iterations_;            ///< Número de iteraciones a ejecutar
     double frequency_;          ///< Frecuencia de ejecución en Hz
     bool* running_;             ///< Puntero a variable de control de ejecución

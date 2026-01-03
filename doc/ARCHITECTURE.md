@@ -6,32 +6,32 @@ Este documento describe la arquitectura de alto nivel del sistema de Control de 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     APLICACIÓN USUARIO                          │
+│                   LIBRERÍA CORE DISCRETESYSTEMS                 │
 │                                                                 │
-│  ┌──────────────────┐              ┌──────────────────────┐   │
-│  │   GUI Qt6        │◄────IPC─────►│  Control Simulator   │   │
-│  │  (gui_app)       │              │  (control_simulator) │   │
-│  │                  │              │                      │   │
-│  │  - QChartView    │              │  - PID Loop          │   │
-│  │  - Parámetros    │              │  - Planta            │   │
-│  │  - Gráficas      │              │  - Generador Señal   │   │
-│  └────────┬─────────┘              └──────────┬───────────┘   │
-│           │                                    │               │
-└───────────┼────────────────────────────────────┼───────────────┘
-            │                                    │
-            ▼                                    ▼
-┌───────────────────────────┐  ┌──────────────────────────────┐
-│  Librería comm (IPC)      │  │  Librería DiscreteSystems    │
-│                           │  │                              │
-│  - MQueueComm             │  │  - DiscreteSystem (base)    │
-│  - serializeDataMessage   │  │  - PIDController            │
-│  - deserializeParamsMsg   │  │  - TransferFunctionSystem   │
-│  - POSIX Message Queues   │  │  - StateSpaceSystem         │
-└───────────────────────────┘  │  - SignalGenerator          │
-                               │  - Hilo/Hilo2in/HiloSignal  │
-                               │  - ADConverter/DAConverter  │
-                               │  - Sumador                  │
-                               └──────────────────────────────┘
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │         Sistemas Discretos (C++17 STL-only)              │  │
+│  │                                                          │  │
+│  │  - DiscreteSystem (base NVI)                            │  │
+│  │  - PIDController, TransferFunctionSystem, etc.          │  │
+│  │  - SignalGenerator (Step, Sine, Ramp, PWM)             │  │
+│  │  - Hilo/Hilo2in/HiloSignal (threading)                 │  │
+│  │  - ADConverter/DAConverter/Sumador                      │  │
+│  │                                                          │  │
+│  │  Buffer circular | Patrón NVI | Tests unitarios        │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│            COMPONENTES AUXILIARES (Interfaz_Control)            │
+│                                                                 │
+│  Simulador + IPC (Proyecto de demostración)                    │
+│                                                                 │
+│  - control_simulator: Ejecuta lazo de control                 │
+│  - comm: POSIX message queues para comunicación               │
+│  - gui_app: Interfaz visual (proyecto del profesor)           │
+│  - Serialización manual: Sin padding                          │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## 🏗️ Capas del Sistema
@@ -65,7 +65,6 @@ Signal (abstracta)
 - Implementar algoritmos de control discreto
 - Gestionar buffers circulares de muestras
 - Proporcionar API reutilizable y testeable
-- Sin dependencias de GUI o IPC
 
 ### 2. Capa de Threading
 
@@ -164,18 +163,18 @@ Este patrón se aplica análogamente en `Hilo` (1 entrada → 1 salida) y `HiloS
 Relación entre las clases de hilos y los bloques que envuelven:
 
 ```
-┌──────────────────────────────┐      wraps      ┌──────────────────────────────┐
-│            Hilo              │ ───────────────►│        DiscreteSystem        │
+┌──────────────────────────────┐      wraps     ┌──────────────────────────────┐
+│            Hilo              │ ──────────────►│        DiscreteSystem        │
 │    (1 entrada → 1 salida)    │                │  PID, TF, SS, DA, AD, ...    │
 └──────────────────────────────┘                └──────────────────────────────┘
 
-┌──────────────────────────────┐      wraps      ┌──────────────────────────────┐
-│           Hilo2in            │ ───────────────►│   DiscreteSystem (Sumador)   │
+┌──────────────────────────────┐      wraps     ┌──────────────────────────────┐
+│           Hilo2in            │ ──────────────►│   DiscreteSystem (Sumador)   │
 │    (2 entradas → 1 salida)   │                │      next(in1, in2)          │
 └──────────────────────────────┘                └──────────────────────────────┘
 
-┌──────────────────────────────┐      wraps      ┌──────────────────────────────┐
-│          HiloSignal          │ ───────────────►│   SignalGenerator::Signal    │
+┌──────────────────────────────┐      wraps     ┌──────────────────────────────┐
+│          HiloSignal          │ ──────────────►│   SignalGenerator::Signal    │
 │      (signal → 1 salida)     │                │    Step / Sine / Ramp / PWM  │
 └──────────────────────────────┘                └──────────────────────────────┘
 
@@ -197,18 +196,18 @@ Notas:
 
 **Ubicación**: `Interfaz_Control/src/comm.*`, `Interfaz_Control/include/comm.h`
 
-Comunicación entre procesos mediante POSIX message queues:
+Comunicación entre procesos mediante POSIX message queues (proyecto separado del profesor):
 
 ```
 ┌─────────────┐                      ┌──────────┐
-│  Simulator  │                      │   GUI    │
+│  Simulator  │                      │   Apps   │
 │             │                      │          │
 │  ┌───────┐  │  DataMessage        │ ┌──────┐ │
-│  │ PID   │──┼──────────────────────┼→│Chart │ │
+│  │ PID   │──┼──────────────────────┼→│Store │ │
 │  └───────┘  │  (samples)          │ └──────┘ │
 │             │                      │          │
 │             │  ParamsMessage      │ ┌──────┐ │
-│  ┌───────┐  │◄─────────────────────┼─│Sliders│
+│  ┌───────┐  │◄─────────────────────┼─│Input │
 │  │Update │  │  (Kp,Ki,Kd,setpoint)│ └──────┘ │
 │  └───────┘  │                      │          │
 └─────────────┘                      └──────────┘
@@ -237,40 +236,6 @@ struct ParamsMessage {
 - Serialización/deserialización manual (sin padding)
 - Gestión de colas POSIX (`/data_queue`, `/params_queue`)
 - Manejo de errores de comunicación
-
-### 4. Capa de Presentación (GUI)
-
-**Ubicación**: `Interfaz_Control/src/mainwindow.*`  
-**Framework**: Qt6
-
-```
-MainWindow
-    │
-    ├── QChartView (gráfica en tiempo real)
-    │   ├── Setpoint line
-    │   ├── Output line
-    │   └── Control line
-    │
-    ├── QSliders (parámetros)
-    │   ├── Kp slider
-    │   ├── Ki slider
-    │   ├── Kd slider
-    │   └── Setpoint slider
-    │
-    └── QTimer (actualización periódica)
-```
-
-**Responsabilidades**:
-- Visualización de datos en tiempo real
-- Captura de parámetros del usuario
-- Envío de comandos al simulador
-- No contiene lógica de control
-
-### 5. Aplicación de Simulación
-
-**Ubicación**: `Interfaz_Control/src/control_simulator.cpp`
-
-Proceso independiente que ejecuta el lazo de control:
 
 ```cpp
 ┌────────────────────────────────────────┐
@@ -309,17 +274,13 @@ Proceso independiente que ejecuta el lazo de control:
 3. **Acción de Control**: `PIDController` genera `u(k)`
 4. **Actualización de Planta**: `TransferFunctionSystem` produce `y(k)`
 5. **Almacenamiento**: Todas las muestras se guardan en buffers
-6. **Transmisión IPC**: Muestras enviadas a GUI
-7. **Visualización**: `QChartView` muestra datos
 
 ### Flujo de Parámetros
 
-1. **Usuario ajusta slider** en GUI
-2. **ParamsMessage** creado y serializado
-3. **Envío via `/params_queue`**
-4. **Simulador recibe** y deserializa
-5. **PID actualizado** con `setGains(Kp, Ki, Kd)`
-6. **Control continúa** con nuevos parámetros
+1. **ParamsMessage** recibido via `/params_queue`
+2. **Simulador deserializa** el mensaje
+3. **PID actualizado** con `setGains(Kp, Ki, Kd)`
+4. **Control continúa** con nuevos parámetros
 
 ## 🧵 Modelo de Concurrencia
 
@@ -341,14 +302,15 @@ Main Thread
 
 Todos los hilos comparten variables protegidas por **un solo mutex global**.
 
-### GUI Process
+### Modelos de Aplicación
 
 ```
-Main Thread (Qt Event Loop)
+GUI/Aplicación del Profesor
+└── Main Thread (o Qt Event Loop)
     │
-    └── QTimer: Lectura de datos IPC @ 50 Hz
+    └── Loop: Lectura de datos IPC
         │
-        └── Actualización de gráficas
+        └── Procesamiento de datos recibidos
 ```
 
 ## 🛡️ Patrones de Diseño

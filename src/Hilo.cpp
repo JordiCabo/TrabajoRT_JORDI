@@ -15,7 +15,7 @@ namespace DiscreteSystems {
  * Crea un nuevo hilo pthread que ejecutará la función threadFunc,
  * iniciando la simulación del sistema a la frecuencia especificada.
  */
-Hilo::Hilo(DiscreteSystem* system, double* input, double* output, bool* running,std::mutex* mtx, double frequency)
+Hilo::Hilo(DiscreteSystem* system, double* input, double* output, bool* running,pthread_mutex_t* mtx, double frequency)
     : system_(system), input_(input), output_(output), mtx_(mtx), frequency_(frequency),running_(running)  
 {
     pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
@@ -61,26 +61,23 @@ void Hilo::run() {
 
     while (true) {
         bool isRunning;
-        {
-            std::lock_guard<std::mutex> lock(*mtx_);
-            isRunning = *running_;
-        }
+        pthread_mutex_lock(mtx_);
+        isRunning = *running_;
+        pthread_mutex_unlock(mtx_);
 
         if (!isRunning)
             break; // salir del bucle si running_ es false
 
         double input;
-        {
-            std::lock_guard<std::mutex> lock(*mtx_);
-            input = *input_;
-        }
+        pthread_mutex_lock(mtx_);
+        input = *input_;
+        pthread_mutex_unlock(mtx_);
 
         double y = system_->next(input);
 
-        {
-            std::lock_guard<std::mutex> lock(*mtx_);
-            *output_ = y;
-        }
+        pthread_mutex_lock(mtx_);
+        *output_ = y;
+        pthread_mutex_unlock(mtx_);
 
 
         usleep(sleep_us);

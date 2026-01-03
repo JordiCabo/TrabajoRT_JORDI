@@ -32,7 +32,7 @@ Los bugs se rastrean como issues de GitHub. Al crear un bug report, incluye:
 - **Título claro y descriptivo**
 - **Pasos para reproducir** el problema
 - **Comportamiento esperado** vs **comportamiento actual**
-- **Versión** del compilador, Qt, CMake
+- **Versión** del compilador y CMake
 - **Sistema operativo**
 - **Logs o capturas** relevantes
 
@@ -92,8 +92,7 @@ cd PL7
 git remote add upstream https://github.com/REPO_ORIGINAL/PL7.git
 
 # Instalar dependencias
-sudo apt-get install build-essential cmake qt6-base-dev qt6-charts-dev \
-                     doxygen graphviz clang-format
+sudo apt-get install build-essential cmake doxygen graphviz clang-format
 
 # Compilar
 mkdir build && cd build

@@ -6,7 +6,7 @@
 
 ## 📋 Descripción
 
-Framework educativo de control de sistemas en tiempo real implementado en C++17. Proporciona una librería de sistemas discretos reutilizables (PID, funciones de transferencia, generadores de señal) y una interfaz gráfica Qt6 para visualización y control en tiempo real.
+Framework educativo de control de sistemas en tiempo real implementado en C++17. Proporciona una librería de sistemas discretos reutilizables (PID, funciones de transferencia, generadores de señal).
 
 **Trabajo Final** para la asignatura de Sistemas en Tiempo Real.
 
@@ -16,10 +16,7 @@ Framework educativo de control de sistemas en tiempo real implementado en C++17.
 - 📊 **Sistemas en espacio de estados** y funciones de transferencia
 - 📡 **Generadores de señal** (escalón, rampa, senoidal, PWM)
 - 🧵 **Ejecución multihilo** con frecuencia configurable
-- 🖥️ **Interfaz gráfica Qt6** con visualización en tiempo real
-- 🔄 **Comunicación IPC** mediante colas de mensajes POSIX
-- 📈 **Visualización de gráficas** con Qt Charts
-- 🔧 **Convertidores A/D y D/A** simulados
+-  **Convertidores A/D y D/A** simulados
 
 ## 🏗️ Arquitectura
 
@@ -35,10 +32,10 @@ PL7/
 │   └── ...
 ├── src/                  # Implementaciones (.cpp)
 ├── test/                 # Tests unitarios (auto-descubiertos)
-├── Interfaz_Control/     # Interfaz gráfica Qt6
-│   ├── src/             # Código fuente GUI
-│   ├── include/         # Headers IPC y comunicación
-│   └── bin/             # Ejecutables compilados
+├── Interfaz_Control/     # Interfaz de control (separada)
+│   ├── src/             # Código fuente
+│   ├── include/         # Headers
+│   └── bin/             # Ejecutables
 ├── doc/                  # Documentación generada
 │   └── doxygen/         # Documentación HTML
 └── CMakeLists.txt        # Build system raíz
@@ -55,10 +52,10 @@ Sistemas discretos C++17 reutilizables:
 - **SignalGenerator**: Señales de prueba (step, sine, ramp, PWM)
 - **Hilo/Hilo2in/HiloSignal**: Ejecución pthread a frecuencia fija
 
-#### 2. Interfaz Gráfica (`Interfaz_Control/`)
-- **GUI Qt6**: Ventana principal con gráficas en tiempo real
+#### 2. Componentes Auxiliares (`Interfaz_Control/`)
+Proyecto separado de demostración del profesor:
+- **Simulador**: Proceso independiente para ejecutar el control
 - **IPC**: Comunicación mediante POSIX message queues
-- **Simulador**: Proceso separado que ejecuta el control PID
 - **Serialización manual**: Sin padding para portabilidad
 
 ## 🚀 Compilación
@@ -67,7 +64,6 @@ Sistemas discretos C++17 reutilizables:
 
 - **Compilador**: GCC/Clang con soporte C++17
 - **CMake**: >= 3.10
-- **Qt6**: Core, Gui, Charts
 - **pthread**: Soporte POSIX threads
 - **rt**: Extensiones de tiempo real (message queues)
 - **Doxygen** (opcional): Para documentación
@@ -78,13 +74,12 @@ Sistemas discretos C++17 reutilizables:
 **Ubuntu/Debian:**
 ```bash
 sudo apt-get update
-sudo apt-get install -y build-essential cmake qt6-base-dev qt6-charts-dev \
-                        libqt6charts6-dev doxygen graphviz
+sudo apt-get install -y build-essential cmake doxygen graphviz
 ```
 
 **Arch Linux:**
 ```bash
-sudo pacman -S base-devel cmake qt6-base qt6-charts doxygen graphviz
+sudo pacman -S base-devel cmake doxygen graphviz
 ```
 
 ### Build Completo
@@ -98,11 +93,6 @@ mkdir -p build && cd build
 cmake ..
 make
 cd ..
-
-# Compilar interfaz gráfica
-cd Interfaz_Control
-./build.sh
-cd ..
 ```
 
 ### Build Manual por Partes
@@ -110,14 +100,6 @@ cd ..
 **Librería Core:**
 ```bash
 cd build
-cmake ..
-make
-```
-
-**Interfaz Gráfica:**
-```bash
-cd Interfaz_Control
-mkdir -p build && cd build
 cmake ..
 make
 ```
@@ -137,16 +119,6 @@ ls test/*.csv test/*.tsv
 ```
 
 ## 🎮 Uso
-
-### Ejecutar Simulador con GUI
-
-```bash
-# Terminal 1: Iniciar simulador
-./Interfaz_Control/bin/control_simulator &
-
-# Terminal 2: Iniciar GUI
-./Interfaz_Control/bin/gui_app
-```
 
 ### Ejemplo de Código: PID Simple
 
@@ -213,9 +185,6 @@ xdg-open doc/doxygen/html/index.html
 ### Documentos Adicionales
 
 - [Instrucciones Copilot](.github/copilot-instructions.md) - Guía para agentes IA
-- [README Interfaz Control](Interfaz_Control/README.md) - Documentación GUI
-- [Diseño GUI](Interfaz_Control/doc/DISEÑO_GUI.md)
-- [Diseño Comunicación IPC](Interfaz_Control/doc/DISEÑO_COMUNICACION.md)
 
 ## 🔧 Configuración
 
@@ -227,25 +196,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3")
 ```
 
-### Parámetros de Simulación
-
-Editar `Interfaz_Control/src/config.h`:
-```cpp
-#define DEFAULT_FREQUENCY_HZ 1000
-#define DEFAULT_KP 1.0
-#define DEFAULT_KI 0.5
-#define DEFAULT_KD 0.1
-```
-
 ## 🐛 Troubleshooting
 
-### Error: "Could not open lock file"
+### Error: "could not open lock file"
 Necesitas permisos sudo para instalar dependencias.
-
-### Error: Qt6 no encontrado
-```bash
-sudo apt-get install qt6-base-dev qt6-charts-dev
-```
 
 ### Error: "cannot create /queue"
 Las colas POSIX requieren permisos. Verifica:

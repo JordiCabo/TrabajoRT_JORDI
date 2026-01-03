@@ -57,7 +57,7 @@ public:
      * @note El período de muestreo de la señal debe coincidir con 1/frequency
      */
     HiloSignal(Signal* signal, double* output, bool* running,
-               std::mutex* mtx, double frequency);
+               pthread_mutex_t* mtx, double frequency);
 
     /**
      * @brief Destructor que espera a que termine el hilo
@@ -77,7 +77,7 @@ private:
     Signal* signal_;            ///< Puntero al generador de señal
     double* output_;            ///< Puntero a variable de salida compartida
     bool* running_;             ///< Puntero a variable de control de ejecución
-    std::mutex* mtx_;           ///< Puntero al mutex para sincronización
+    pthread_mutex_t* mtx_;           ///< Puntero al mutex POSIX para sincronización
     double frequency_;          ///< Frecuencia de ejecución en Hz
 
     pthread_t thread_;          ///< Identificador del hilo pthread

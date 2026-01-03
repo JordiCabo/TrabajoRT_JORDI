@@ -4,7 +4,9 @@
 #include "TransferFunctionSystem.h"
 #include "Hilo.h"
 #include "Hilo2in.h"
+#include "HiloPID.h"
 #include "VariablesCompartidas.h"
+#include "ParametrosCompartidos.h"
 #include "PIDController.h"
 #include "DiscreteSystem.h"
 #include <pthread.h>
@@ -12,11 +14,18 @@
 #include "Sumador.h"
 #include "DAConverter.h"
 #include "HiloSignal.h"
+#include "SignalSwitch.h"
+#include "HiloSwitch.h"
+#include "Transmisor.h"
+#include "HiloTransmisor.h"
+#include "Receptor.h"
+#include "HiloReceptor.h"
 
 using namespace DiscreteSystems;
 
  VariablesCompartidas vars;
- int N=4000;//Numero de iteraciones del bucle principal
+ ParametrosCompartidos params;
+ 
 
 int main() {
     // --- Variables compartidas ---
@@ -24,24 +33,34 @@ int main() {
     vars.running = true;  // inicializamos el flag
 
   //-------------------------------------------------------------
-  // --- Crear la referencia -----------------------------------------
+  // --- Crear la referencia (SignalSwitch) -----------------------------------------
   //---------------------------------------------------------------
    // Parámetros del escalón
-    double Ts_step = 0.01;       // período de muestreo [s]
-    double amplitude = 1.0; // amplitud del escalón
-    double step_time = 0.05; // tiempo donde se produce el escalón
-    double offset = 0.0;     // desplazamiento vertical
+    double Ts_signal = 0.01;     // período de muestreo común [s]
+    double amplitude = 1.0;     // amplitud
+    double step_time = 0.05;     // tiempo del escalón
+    double offset = 0.0;         // desplazamiento vertical
    
-    //parametros para el seno
-    double Ts_sin = 0.01;       // período de muestreo [s]
-    double freq = 1.0; // frecuencia en Hz
-    double phase = 0.0;     // fase en radianes                         
-
+    // Parámetros para el seno
+    double freq = 1.0;           // frecuencia en Hz
+    double phase = 0.0;          // fase en radianes
     
-    SignalGenerator::StepSignal stepSignal(Ts_step, amplitude, step_time, offset);
-      SignalGenerator::SineSignal sinSignal(Ts_sin,  amplitude, freq, phase, offset);
+    // Parámetros para PWM
+    double duty = 0.5;           // ciclo de trabajo
+    double period_pwm = 1.0;     // período de PWM [s]
 
-    SignalGenerator::HiloSignal hiloRef(&sinSignal,&vars.ref, &vars.running, &vars.mtx, 1/Ts_sin);
+    // Crear las 3 señales como shared_ptr
+    auto stepSignal = std::make_shared<SignalGenerator::StepSignal>(Ts_signal, amplitude, step_time, offset);
+    auto sinSignal = std::make_shared<SignalGenerator::SineSignal>(Ts_signal, amplitude, freq, phase, offset);
+    auto pwmSignal = std::make_shared<SignalGenerator::PwmSignal>(Ts_signal, amplitude, duty, period_pwm, offset);
+
+    // Crear SignalSwitch (selector inicial = 1: escalón)
+    SignalGenerator::SignalSwitch signalSwitch(stepSignal, sinSignal, pwmSignal, 1);
+    
+   
+    
+    // Crear HiloSwitch para ejecutar el switch periódicamente
+    HiloSwitch hiloRef(&signalSwitch, &vars.ref, &vars.running, &vars.mtx, &params, 1/Ts_signal);
   
     //-------------------------------------------------------------
   // --- Crear la planta -----------------------------------------
@@ -72,13 +91,20 @@ int main() {
 // Crear PID-----------------------------------------------
 //-------------------------------------------------------------
 
-    double Kp = 5.0;
-    double Ki = 3.0;
-    double Kd = 0.7;
-    double Ts_controller = 0.01;  // periodo de muestreo 0.1 s
+    // Inicializar parámetros compartidos con valores por defecto
+    pthread_mutex_lock(&params.mtx);
+    params.kp = 5.0;
+    params.ki = 3.0;
+    params.kd = 0.7;
+    params.setpoint = 80.0;  // igual a la amplitud del escalón
+    pthread_mutex_unlock(&params.mtx);
 
-    PIDController pid(Kp, Ki, Kd, Ts_controller);
-    Hilo hiloPID(&pid, &vars.e, &vars.u, &vars.running, &vars.mtx, 1/Ts_controller);
+    double Ts_controller = 0.01;  // periodo de muestreo 0.01 s
+
+    PIDController pid(params.kp, params.ki, params.kd, Ts_controller);
+    
+    // Usar HiloPID que lee parámetros dinámicamente
+    HiloPID hiloPID(&pid, &vars, &params, 1/Ts_controller);
 
     //-------------------------------------------------------------
     //Crear DAConverter-----------------------------------------------
@@ -96,30 +122,75 @@ int main() {
     Sumador sumador(Ts_sumador);
     Hilo2in hiloSumador(&sumador, &vars.ref, &vars.ykd,  &vars.e, &vars.running, &vars.mtx, 1/Ts_sumador);
 
+    // --- Crear transmisor para enviar datos via IPC ---
+    Transmisor transmisor(&vars);
+    if (!transmisor.inicializar()) {
+        std::cerr << "Error: No se pudo inicializar el Transmisor" << std::endl;
+        vars.running = false;
+        return 1;
+    }
+    std::cout << "Transmisor inicializado correctamente" << std::endl;
 
-    // --- Bucle principal: enviar referencia y leer salida en tiempo real ---
- 
-    for (int k = 0; k < N; ++k) {
-             // Leer salida de la planta
+    // --- Crear hilo de transmisión a 50 Hz ---
+    HiloTransmisor hiloTransmisor(&transmisor, &vars.running, &vars.mtx, 50.0);
+    std::cout << "Hilo de transmisión iniciado a 50 Hz" << std::endl;
+
+    // --- Crear receptor para recibir parámetros via IPC ---
+    Receptor receptor(&params);
+    if (!receptor.inicializar()) {
+        std::cerr << "Error: No se pudo inicializar el Receptor" << std::endl;
+        vars.running = false;
+        return 1;
+    }
+    std::cout << "Receptor inicializado correctamente" << std::endl;
+
+    // --- Crear hilo de recepción a 50 Hz ---
+    HiloReceptor hiloReceptor(&receptor, &vars.running, &vars.mtx, 50.0);
+    std::cout << "Hilo de recepción iniciado a 50 Hz" << std::endl;
+
+    // --- Bucle principal: monitorizar salida en tiempo real ---
+    int k=0;
+    while(true) {
+        // Leer salida de la planta
         double yk;
-        {
-            std::lock_guard<std::mutex> lock(vars.mtx);
-            yk = vars.yk;
-        }
+        pthread_mutex_lock(&vars.mtx);
+        yk = vars.yk;
+        pthread_mutex_unlock(&vars.mtx);
+
+        // Leer parámetros actuales del PID y tipo de señal
+        double kp_actual, ki_actual, kd_actual, setpoint_actual;
+        int signal_type_actual;
+        pthread_mutex_lock(&params.mtx);
+        kp_actual = params.kp;
+        ki_actual = params.ki;
+        kd_actual = params.kd;
+        setpoint_actual = params.setpoint;
+        signal_type_actual = params.signal_type;
+        pthread_mutex_unlock(&params.mtx);
 
         std::cout << "k=" << k
                   << " | Ref=" << vars.ref
-                  << " | Planta yk=" << yk
+                  << " | u=" << vars.u
+                  << " | yk=" << yk
+                  << " | Kp=" << kp_actual
+                  << " | Ki=" << ki_actual
+                  << " | Kd=" << kd_actual
+                  << " | Setpoint=" << setpoint_actual
+                  << " | Signal=" << signal_type_actual << " (0=step,1=sine,2=pwm)"
+                  << " | t=" << transmisor.getTiempoTranscurrido() << "s"
                   << std::endl;
-
-        usleep(5000); // 5 ms (más rápido que el hilo)
+        k++;
+        usleep(50000); // 50 ms entre impresiones
     }
 
     // --- Indicar al hilo que termine ---
-    {
-        std::lock_guard<std::mutex> lock(vars.mtx);
-        vars.running = false;
-    }
+    pthread_mutex_lock(&vars.mtx);
+    vars.running = false;
+    pthread_mutex_unlock(&vars.mtx);
+
+    // Cerrar transmisor y receptor
+    transmisor.cerrar();
+    receptor.cerrar();
 
     // --- Recoger la terminación del hilo con pthread_join ---
    void* statusVal;

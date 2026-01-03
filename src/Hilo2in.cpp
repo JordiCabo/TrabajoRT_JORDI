@@ -16,7 +16,7 @@ namespace DiscreteSystems {
  * iniciando la simulación del sistema a la frecuencia especificada.
  */
 Hilo2in::Hilo2in(DiscreteSystem* system, double* input1, double* input2, double* output,
-                 bool* running, std::mutex* mtx, double frequency)
+                 bool *running, pthread_mutex_t* mtx, double frequency)
     : system_(system), input1_(input1), input2_(input2), output_(output),
       running_(running), mtx_(mtx), frequency_(frequency)
 {
@@ -63,27 +63,24 @@ void Hilo2in::run() {
 
     while (true) {
         bool isRunning;
-        {
-            std::lock_guard<std::mutex> lock(*mtx_);
-            isRunning = *running_;
-        }
+        pthread_mutex_lock(mtx_);
+        isRunning = *running_;
+        pthread_mutex_unlock(mtx_);
 
         if (!isRunning)
             break; // salir del bucle si running_ es false
 
         double in1, in2;
-        {
-            std::lock_guard<std::mutex> lock(*mtx_);
-            in1 = *input1_;
-            in2 = *input2_;
-        }
+        pthread_mutex_lock(mtx_);
+        in1 = *input1_;
+        in2 = *input2_;
+        pthread_mutex_unlock(mtx_);
 
         double y = system_->next(in1, in2);
 
-        {
-            std::lock_guard<std::mutex> lock(*mtx_);
-            *output_ = y;
-        }
+        pthread_mutex_lock(mtx_);
+        *output_ = y;
+        pthread_mutex_unlock(mtx_);
 
         usleep(sleep_us);
     }

@@ -16,7 +16,7 @@ namespace SignalGenerator {
  * generando muestras de la señal a la frecuencia especificada.
  */
 HiloSignal::HiloSignal(Signal* signal, double* output, bool* running,
-                       std::mutex* mtx, double frequency)
+                       pthread_mutex_t* mtx, double frequency)
     : signal_(signal), output_(output),
       running_(running), mtx_(mtx), frequency_(frequency)
 {
@@ -65,10 +65,9 @@ void HiloSignal::run() {
     while (true) {
 
         bool isRunning;
-        {
-            std::lock_guard<std::mutex> lock(*mtx_);
-            isRunning = *running_;
-        }
+        pthread_mutex_lock(mtx_);
+        isRunning = *running_;
+        pthread_mutex_unlock(mtx_);
 
         if (!isRunning)
             break;
@@ -77,10 +76,9 @@ void HiloSignal::run() {
         double y = signal_->next();
 
         // Guardarla en la salida compartida
-        {
-            std::lock_guard<std::mutex> lock(*mtx_);
-            *output_ = y;
-        }
+        pthread_mutex_lock(mtx_);
+        *output_ = y;
+        pthread_mutex_unlock(mtx_);
 
         usleep(sleep_us);
     }

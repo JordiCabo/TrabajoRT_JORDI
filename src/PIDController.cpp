@@ -92,6 +92,76 @@ std::ostream& operator<<(std::ostream& os, const PIDController& pid)
     return os;
 }
 
+/**
+ * @brief Actualiza la ganancia proporcional
+ * @param Kp Nuevo valor de ganancia proporcional
+ */
+void PIDController::setKp(double Kp) {
+    Kp_ = Kp;
+}
+
+/**
+ * @brief Actualiza la ganancia integral
+ * @param Ki Nuevo valor de ganancia integral
+ */
+void PIDController::setKi(double Ki) {
+    Ki_ = Ki;
+}
+
+/**
+ * @brief Actualiza la ganancia derivativa
+ * @param Kd Nuevo valor de ganancia derivativa
+ */
+void PIDController::setKd(double Kd) {
+    Kd_ = Kd;
+}
+
+/**
+ * @brief Actualiza todas las ganancias PID simultáneamente
+ * @param Kp Nueva ganancia proporcional
+ * @param Ki Nueva ganancia integral
+ * @param Kd Nueva ganancia derivativa
+ * 
+ * Más eficiente que llamar a setKp(), setKi() y setKd() por separado.
+ */
+void PIDController::setGains(double Kp, double Ki, double Kd) {
+    Kp_ = Kp;
+    Ki_ = Ki;
+    Kd_ = Kd;
+}
+
+/**
+ * @brief Obtiene la ganancia proporcional actual
+ * @return Valor de Kp
+ */
+double PIDController::getKp() const {
+    return Kp_;
+}
+
+/**
+ * @brief Obtiene la ganancia integral actual
+ * @return Valor de Ki
+ */
+double PIDController::getKi() const {
+    return Ki_;
+}
+
+/**
+ * @brief Obtiene la ganancia derivativa actual
+ * @return Valor de Kd
+ */
+double PIDController::getKd() const {
+    return Kd_;
+}
+
+/**
+ * @brief Obtiene la última acción de control calculada
+ * @return Valor u[k-1]
+ */
+double PIDController::getLastControl() const {
+    return uHist_.empty() ? 0.0 : uHist_.back();
+}
+
 
 } 
 

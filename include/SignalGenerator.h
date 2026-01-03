@@ -66,7 +66,7 @@ public:
      * @return Valor de la señal en el tiempo actual.
      */
     double compute() const;
-
+ 
     /**
      * @brief Calcula el valor de la señal en la muestra k (sin efectos).
      *

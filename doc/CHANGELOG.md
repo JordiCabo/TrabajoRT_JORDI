@@ -33,19 +33,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - `Hilo2in`: Ejecución de sistema con dos entradas
   - `HiloSignal`: Ejecución de generador de señal
 - Sistema de build CMake con auto-descubrimiento de tests
-- Interfaz gráfica Qt6 (`Interfaz_Control/`):
-  - Ventana principal con gráficas en tiempo real
-  - Control de parámetros PID (Kp, Ki, Kd, Setpoint)
-  - Visualización con Qt Charts
+- Componentes auxiliares en `Interfaz_Control/` (proyecto del profesor):
+  - Simulador independiente de sistema con PID
+  - Comunicación IPC mediante POSIX message queues
+  - Ejecutables de demostración y prueba
 - Comunicación IPC mediante POSIX message queues:
   - Librería `comm` con serialización manual
   - Tipos de mensaje: `DataMessage`, `ParamsMessage`
-  - Cola de datos (simulador → GUI)
-  - Cola de parámetros (GUI → simulador)
-- Ejecutables:
-  - `control_simulator`: Simulador de sistema con PID
-  - `gui_app`: Aplicación gráfica Qt6
-  - `test_send` / `test_receive`: Tests de comunicación IPC
 - Tests unitarios en directorio `test/`:
   - `testPID`: Test de controlador PID
   - `testTF`: Test de función de transferencia

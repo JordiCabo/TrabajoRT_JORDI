@@ -1,9 +1,10 @@
 #pragma once
-#include <mutex>
+#include <pthread.h>
 
 class VariablesCompartidas {
 public:
     VariablesCompartidas();   // Constructor
+    ~VariablesCompartidas();  // Destructor
 
     // Variables compartidas
     double ref;     // Referencia del sistema
@@ -14,6 +15,6 @@ public:
     double ykd;     // Salida digital tras AD
     bool running;  // Indicador de ejecución del hilo
 
-    // Mutex para proteger todas las variables
-    std::mutex mtx;
+    // Mutex POSIX para proteger todas las variables
+    pthread_mutex_t mtx;
 };

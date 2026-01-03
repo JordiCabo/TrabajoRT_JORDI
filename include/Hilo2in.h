@@ -55,7 +55,7 @@ public:
      * @note Para sistemas como Sumador, input1 es la referencia e input2 es la realimentación
      */
     Hilo2in(DiscreteSystem* system, double* input1, double* input2, double* output, 
-            bool *running, std::mutex* mtx, double frequency=100);
+            bool *running, pthread_mutex_t* mtx, double frequency=100);
 
     /**
      * @brief Obtiene el identificador del hilo pthread
@@ -76,7 +76,7 @@ private:
     double* input1_;            ///< Puntero a primera variable de entrada compartida
     double* input2_;            ///< Puntero a segunda variable de entrada compartida
     double* output_;            ///< Puntero a variable de salida compartida
-    std::mutex* mtx_;           ///< Puntero al mutex para sincronización
+    pthread_mutex_t* mtx_;           ///< Puntero al mutex POSIX para sincronización
     int iterations_;            ///< Número de iteraciones a ejecutar
     double frequency_;          ///< Frecuencia de ejecución en Hz
     bool* running_;             ///< Puntero a variable de control de ejecución

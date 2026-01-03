@@ -22,7 +22,6 @@ Guía detallada de instalación para PL7 Control de Sistemas Discretos en difere
 ### Software Requerido
 - **Compilador C++**: GCC >= 7.0 o Clang >= 5.0 con soporte C++17
 - **CMake**: >= 3.10
-- **Qt6**: Qt6 Core, Gui, Charts
 - **pthread**: Soporte POSIX threads (incluido en sistemas Unix)
 - **rt**: POSIX real-time extensions (message queues)
 
@@ -43,16 +42,12 @@ sudo apt-get update
 # Instalar dependencias de compilación
 sudo apt-get install -y build-essential cmake git
 
-# Instalar Qt6
-sudo apt-get install -y qt6-base-dev libqt6charts6-dev
-
 # Instalar herramientas de documentación (opcional)
 sudo apt-get install -y doxygen graphviz
 
 # Verificar instalación
 g++ --version      # Debe ser >= 7.0
 cmake --version    # Debe ser >= 3.10
-qmake6 --version   # Verifica Qt6
 ```
 
 ### Debian 11/12
@@ -66,7 +61,6 @@ sudo apt-get update
 
 # Instalar dependencias
 sudo apt-get install -y build-essential cmake git
-sudo apt-get install -y qt6-base-dev libqt6charts6-dev
 sudo apt-get install -y doxygen graphviz
 ```
 
@@ -79,16 +73,12 @@ sudo pacman -Syu
 # Instalar dependencias base
 sudo pacman -S base-devel cmake git
 
-# Instalar Qt6
-sudo pacman -S qt6-base qt6-charts
-
 # Instalar herramientas de documentación (opcional)
 sudo pacman -S doxygen graphviz
 
 # Verificar instalación
 g++ --version
 cmake --version
-qmake6 --version
 ```
 
 ## 🎩 Fedora/RHEL
@@ -139,17 +129,11 @@ sudo dnf install -y doxygen graphviz
 
 # Instalar dependencias
 brew install cmake git
-brew install qt@6
 brew install doxygen graphviz
-
-# Añadir Qt al PATH
-echo 'export PATH="/usr/local/opt/qt@6/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
 
 # Verificar instalación
 g++ --version
 cmake --version
-qmake --version
 ```
 
 ## 🔧 Compilación del Proyecto
@@ -166,11 +150,6 @@ mkdir -p build && cd build
 cmake ..
 make -j$(nproc)  # Compilación paralela
 cd ..
-
-# Compilar interfaz gráfica
-cd Interfaz_Control
-./build.sh
-cd ..
 ```
 
 ## ✅ Verificación de Instalación
@@ -180,20 +159,9 @@ cd ..
 ```bash
 # Verificar que los ejecutables se crearon
 ls -lh bin/
-ls -lh Interfaz_Control/bin/
 
 # Ejecutar un test simple
 ./bin/testPID
-```
-
-### Verificar Qt6
-
-```bash
-# Verificar módulos Qt instalados
-qmake6 -query
-
-# Buscar Qt Charts
-pkg-config --modversion Qt6Charts
 ```
 
 ### Verificar Dependencias del Sistema
@@ -240,21 +208,16 @@ open doc/doxygen/html/index.html      # macOS
 
 **Ubuntu/Debian:**
 ```bash
-# Instalar paquetes Qt6 adicionales
-sudo apt-get install -y qt6-base-dev qt6-base-dev-tools \
-    libqt6charts6-dev qt6-charts-dev
-
-# Verificar instalación
-dpkg -l | grep qt6
+# Instalar paquetes de compilación
+sudo apt-get install -y build-essential cmake git
+sudo apt-get install -y doxygen graphviz
 ```
 
-**Si aún falla:**
+**Otros sistemas:**
 ```bash
-# Buscar qmake6
-which qmake6
-
-# Añadir al PATH si es necesario
-export PATH="/usr/lib/qt6/bin:$PATH"
+# Verifica que tienes los compiladores básicos
+g++ --version
+cmake --version
 ```
 
 ### Error: "CMake version too old"
@@ -268,19 +231,6 @@ sudo snap install cmake --classic
 
 # Verificar versión
 cmake --version
-```
-
-### Error: "Cannot find -lQt6Charts"
-
-```bash
-# Ubuntu/Debian
-sudo apt-get install -y libqt6charts6-dev
-
-# Arch
-sudo pacman -S qt6-charts
-
-# Fedora
-sudo dnf install -y qt6-qtcharts-devel
 ```
 
 ### Error: "undefined reference to pthread_create"
@@ -349,8 +299,7 @@ rm -rf build/ Interfaz_Control/build/
 mkdir -p build && cd build
 cmake ..
 make -j$(nproc)
-cd ../Interfaz_Control
-./build.sh
+cd ..
 ```
 
 ---
