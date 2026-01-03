@@ -52,11 +52,28 @@ Sistemas discretos C++17 reutilizables:
 - **SignalGenerator**: Señales de prueba (step, sine, ramp, PWM)
 - **Hilo/Hilo2in/HiloSignal**: Ejecución pthread a frecuencia fija
 
-#### 2. Componentes Auxiliares (`Interfaz_Control/`)
-Proyecto separado de demostración del profesor:
-- **Simulador**: Proceso independiente para ejecutar el control
-- **IPC**: Comunicación mediante POSIX message queues
-- **Serialización manual**: Sin padding para portabilidad
+#### 2. Componentes IPC y Comunicación
+Sistema de comunicación entre procesos para GUI en tiempo real:
+- **Receptor**: Recibe parámetros PID desde mqueue (GUI → Simulador)
+- **Transmisor**: Envía datos de control para visualización (Simulador → GUI)
+- **ParametrosCompartidos**: Variables thread-safe para Kp, Ki, Kd, setpoint
+- **VariablesCompartidas**: Variables thread-safe del lazo de control (ref, e, u, y, yk)
+- **Serialización manual**: Sin padding de structs para portabilidad
+
+#### 3. Hilos Especializados
+Wrappers de threading para componentes IPC:
+- **HiloPID**: Ejecutor especializado de PIDController con parámetros dinámicos
+- **HiloReceptor**: Recepción periódica de parámetros desde GUI
+- **HiloTransmisor**: Envío periódico de datos de control a GUI
+- **HiloSwitch**: Multiplexado dinámico de señales de referencia
+- **HiloSignal**: Generación periódica de señal de referencia
+- **Hilo/Hilo2in**: Ejecutores generales para cualquier DiscreteSystem
+
+#### 4. Componentes Auxiliares (`Interfaz_Control/`)
+Proyecto separado de demostración:
+- **control_simulator**: Ejecutable que corre el lazo de control con IPC
+- **gui_app**: Interfaz Qt6 para visualización y sintonización en vivo
+- **test_send/test_receive**: Utilidades para probar comunicación IPC
 
 ## 🚀 Compilación
 
@@ -150,28 +167,63 @@ int main() {
 }
 ```
 
-### Ejemplo: Sistema con Hilos
+### Ejemplo: Sistema Completo con GUI en Tiempo Real
 
 ```cpp
-#include "Hilo.h"
-#include "PIDController.h"
-#include <mutex>
+// control_simulator.cpp - Lazo de control con IPC
+
+#include "HiloPID.h"
+#include "HiloSwitch.h"
+#include "HiloReceptor.h"
+#include "HiloTransmisor.h"
+#include "SignalGenerator.h"
 
 int main() {
-    std::mutex mtx;
-    double ref = 1.0, feedback = 0.0, control = 0.0;
-    bool running = true;
+    // Estructuras compartidas (thread-safe)
+    ParametrosCompartidos params;   // Recibe Kp, Ki, Kd de GUI
+    VariablesCompartidas vars;      // Estado del lazo (ref, e, u, yk)
+    
+    // Componentes de control
+    auto step = std::make_shared<SignalGenerator::StepSignal>(0.001, 1.0);
+    auto sine = std::make_shared<SignalGenerator::SineSignal>(0.001, 1.0, 0.5);
+    SignalGenerator::SignalSwitch sw(step, sine, 1);
     
     DiscreteSystems::PIDController pid(1.0, 0.5, 0.1, 0.001);
-    DiscreteSystems::Hilo hilo_pid(&pid, &ref, &control, &running, &mtx, 1000);
+    DiscreteSystems::TransferFunctionSystem planta(/*...*/, 0.001);
     
-    // El hilo ejecuta automáticamente a 1000 Hz
-    sleep(5);  // Simular 5 segundos
+    // Comunicación IPC
+    Receptor receptor(&params);
+    Transmisor transmisor(&vars);
     
-    running = false;  // Detener hilo
+    if (receptor.inicializar() && transmisor.inicializar()) {
+        // Crear hilos especializados
+        HiloSwitch hiloSw(&sw, &vars.ref, &vars.running, &vars.mtx, &params, 100);
+        HiloPID hiloPID(&pid, &vars, &params, 100);
+        Hilo hiloSumador(&sumador, &vars.ref, &vars.e, &vars.running, &vars.mtx, 100);
+        HiloReceptor hiloRx(&receptor, &vars.running, &vars.mtx, 50);
+        HiloTransmisor hiloTx(&transmisor, &vars.running, &vars.mtx, 50);
+        
+        // El sistema está ejecutando automáticamente...
+        sleep(10);  // Simular 10 segundos
+        
+        // Señal de detención
+        {
+            std::lock_guard<pthread_mutex_t> lock(vars.mtx);
+            vars.running = false;
+        }
+    }
+    
+    transmisor.cerrar();
+    receptor.cerrar();
     return 0;
 }
 ```
+
+Esta arquitectura permite:
+1. **Ejecución en tiempo real**: Lazo de control a frecuencia fija (~1 kHz)
+2. **Visualización en vivo**: GUI recibe datos a 50 Hz sin afectar al lazo
+3. **Sintonización dinámica**: Cambiar Kp, Ki, Kd en tiempo real desde GUI
+4. **Multiplexado de señales**: Cambiar entre escalón/rampa/senoidal sin interrumpir
 
 ## 📚 Documentación
 

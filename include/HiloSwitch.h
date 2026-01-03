@@ -1,22 +1,12 @@
-/*
+/**
  * @file HiloSwitch.h
+ * @brief Threading para multiplexado dinámico de señales de referencia
+ * @author Jordi + GitHub Copilot
+ * @date 2026-01-03
  * 
- * @author Jordi
- * @author GitHub Copilot (asistencia)
- * 
- * @brief Wrapper de threading para SignalSwitch con frecuencia dinámica
- * 
- * Ejecuta el método next() de un SignalSwitch en un hilo pthread
- * a frecuencia fija, permitiendo generación periódica de la señal
- * seleccionada sin bloquear el hilo principal.
- * 
- * Uso típico:
- *   VariablesCompartidas vars;
- *   SignalSwitch sw(step, sine, pwm, 1);
- *   HiloSwitch hiloSw(&sw, &vars.ref, &vars.running, &vars.mtx, 100.0); // 100 Hz
- *   // El hilo genera valores a 100 Hz
- *   sw.setSelector(2); // Cambiar a seno dinámicamente
- *   vars.running = false; // Detener
+ * Implementa un hilo POSIX que ejecuta un SignalSwitch para permitir
+ * cambio dinámico de la señal de referencia (escalón, rampa, senoidal, PWM)
+ * sin interrumpir la ejecución del lazo de control.
  */
 
 #ifndef HILO_SWITCH_H
@@ -28,22 +18,74 @@
 
 /**
  * @class HiloSwitch
- * @brief Ejecuta SignalSwitch periódicamente en hilo separado
+ * @brief Hilo dedicado para multiplexado dinámico de señales de referencia
  * 
- * Envuelve un objeto SignalSwitch y ejecuta su método next() en un
- * hilo pthread a frecuencia configurable. Sincroniza escritura en
- * variable compartida mediante mutex.
+ * Ejecuta un SignalSwitch en un hilo pthread separado a frecuencia fija.
+ * Permite que la GUI seleccione dinámicamente entre diferentes tipos de
+ * señales de referencia (escalón, rampa, senoidal, PWM) modificando
+ * signal_type en ParametrosCompartidos.
+ * 
+ * Generador de referencia:
+ * @verbatim
+ *                    ┌──────────────┐
+ *                    │  signal_type │ (from ParametrosCompartidos)
+ *                    │   (1,2,3,4)  │
+ *                    └───────┬──────┘
+ *                            │
+ *     ┌───────┬───────┬──────v──────┬──────────┐
+ *     │       │       │              │          │
+ *     v       v       v              v          v
+ *   Escalón Rampa  Senoidal         PWM     Noise(?)
+ *     │       │       │              │          │
+ *     └───────┴───────┴──────┬───────┴──────────┘
+ *                            │
+ *                       HiloSwitch
+ *                            │
+ *                       next() → output
+ *                            │
+ *                    VariablesCompartidas.ref
+ * @endverbatim
+ * 
+ * Patrón de uso (en control_simulator):
+ * @code{.cpp}
+ * VariablesCompartidas vars;
+ * ParametrosCompartidos params;
+ * 
+ * auto step = std::make_shared<SignalGenerator::StepSignal>(0.001, 1.0);
+ * auto sine = std::make_shared<SignalGenerator::SineSignal>(0.001, 1.0, 0.5);
+ * auto ramp = std::make_shared<SignalGenerator::RampSignal>(0.001, 1.0, 0.1);
+ * 
+ * SignalGenerator::SignalSwitch sw(step, sine, ramp, 1);  // Inicia en escalón
+ * 
+ * HiloSwitch hiloSw(&sw, &vars.ref, &vars.running, &vars.mtx, &params, 100.0);
+ * 
+ * // La GUI cambia signal_type:
+ * {
+ *     std::lock_guard<pthread_mutex_t> lock(params.mtx);
+ *     params.signal_type = 2;  // Cambiar a rampa
+ * }
+ * // HiloSwitch detecta el cambio y conmuta automáticamente
+ * @endcode
+ * 
+ * @invariant frequency_ > 0 (Hz)
+ * @invariant El hilo solo ejecuta signalSwitch->next() mientras *running_ == true
+ * @invariant signal_type en params debe ser válido (1-4) para el SignalSwitch
  */
 class HiloSwitch {
 public:
     /**
-     * @brief Constructor que crea e inicia el hilo
-     * @param signalSwitch Puntero al multiplexor de señales
-     * @param output Puntero a variable de salida compartida, se puede usar para meter ruido al sistema
-     * @param running Puntero al flag de ejecución (bajo mutex)
-     * @param mtx Puntero al mutex compartido POSIX
-     * @param params Puntero a parámetros compartidos (para leer signal_type)
-     * @param frequency Frecuencia de ejecución en Hz (debe ser >= frecuencia de todas las señales)
+     * @brief Constructor que crea e inicia el hilo de generación de señal
+     * 
+     * @param signalSwitch Puntero al multiplexor de señales configurado
+     * @param output Puntero a variable de salida compartida donde escribir la señal generada
+     * @param running Puntero a variable booleana de control
+     * @param mtx Puntero al mutex POSIX compartido
+     * @param params Puntero a ParametrosCompartidos para leer signal_type dinámicamente
+     * @param frequency Frecuencia de ejecución en Hz (debe ser >= todas las señales)
+     * 
+     * @note El hilo comienza a ejecutarse inmediatamente
+     * @note La frecuencia debe ser lo suficientemente alta para muestrear la señal más rápida
+     * @note El SignalSwitch debe estar configurado con las señales a usar
      */
     HiloSwitch(SignalGenerator::SignalSwitch* signalSwitch, double* output,
                bool* running, pthread_mutex_t* mtx, ParametrosCompartidos* params,

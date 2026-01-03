@@ -192,50 +192,213 @@ Notas:
 - `Hilo`       → envuelve `TransferFunctionSystem`/`StateSpaceSystem` ⇒ lee `u_analog` y escribe `y`
 - `Hilo`       → envuelve `ADConverter` ⇒ lee `y` y escribe `y_digital`
 
-### 3. Capa de Comunicación (IPC)
+### 3. Capa de Comunicación Inter-Procesos (IPC)
 
-**Ubicación**: `Interfaz_Control/src/comm.*`, `Interfaz_Control/include/comm.h`
+**Ubicación**: `include/`, `src/` (clases IPC principales)  
+**Namespace**: Global (Receptor, Transmisor, ParametrosCompartidos, VariablesCompartidas)
 
-Comunicación entre procesos mediante POSIX message queues (proyecto separado del profesor):
+Sistema de comunicación entre procesos para visualización en tiempo real y sintonización dinámica:
 
-```
-┌─────────────┐                      ┌──────────┐
-│  Simulator  │                      │   Apps   │
-│             │                      │          │
-│  ┌───────┐  │  DataMessage        │ ┌──────┐ │
-│  │ PID   │──┼──────────────────────┼→│Store │ │
-│  └───────┘  │  (samples)          │ └──────┘ │
-│             │                      │          │
-│             │  ParamsMessage      │ ┌──────┐ │
-│  ┌───────┐  │◄─────────────────────┼─│Input │
-│  │Update │  │  (Kp,Ki,Kd,setpoint)│ └──────┘ │
-│  └───────┘  │                      │          │
-└─────────────┘                      └──────────┘
-```
+#### 3.1 Estructuras Compartidas
 
-**Tipos de Mensaje**:
 ```cpp
+class ParametrosCompartidos {
+    double kp, ki, kd;          // Ganancias PID (sintonizables)
+    double setpoint;            // Referencia deseada
+    int signal_type;            // Tipo de señal (1=step, 2=ramp, 3=sine)
+    pthread_mutex_t mtx;        // Protección thread-safe
+};
+
+class VariablesCompartidas {
+    double ref;                 // Referencia del sistema
+    double e;                   // Error: e(k) = ref - ykd
+    double u;                   // Acción de control PID
+    double ua;                  // Control analógico (post D/A)
+    double yk;                  // Salida de planta (analógica)
+    double ykd;                 // Salida digitalizada (post A/D)
+    bool running;               // Flag de ejecución
+    pthread_mutex_t mtx;        // Protección thread-safe
+};
+```
+
+#### 3.2 Componentes de Comunicación
+
+```cpp
+class Receptor {
+    // Recibe ParamsMessage desde mqueue
+    // Actualiza ParametrosCompartidos con lock
+    bool recibir();
+};
+
+class Transmisor {
+    // Lee VariablesCompartidas con lock
+    // Envía DataMessage a mqueue
+    bool enviar();
+};
+```
+
+#### 3.3 Hilos Especializados para IPC
+
+```cpp
+class HiloReceptor {
+    // Ejecuta Receptor::recibir() periódicamente
+    // Permite cambios de parámetros sin interrumpir el lazo
+};
+
+class HiloTransmisor {
+    // Ejecuta Transmisor::enviar() periódicamente
+    // Envía muestras a GUI a frecuencia controlada (típicamente 50 Hz)
+};
+
+class HiloPID {
+    // Especialización de Hilo para PIDController
+    // Lee parámetros dinámicamente de ParametrosCompartidos cada ciclo
+    // Permite sintonización en línea sin recrear el controlador
+};
+
+class HiloSwitch {
+    // Ejecuta SignalSwitch periódicamente
+    // Lee signal_type de ParametrosCompartidos para cambiar generador
+    // Permite cambiar entre escalón/rampa/senoidal en tiempo real
+};
+```
+
+#### 3.4 Arquitectura del Sistema Completo
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│               Proceso Simulador (control_simulator)              │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │          Variables Compartidas (mutex-protegidas)        │   │
+│  │  VariablesCompartidas: ref, e, u, ua, yk, ykd, running │   │
+│  └────────────────┬────────────────────────────────────────┘   │
+│                   │                                             │
+│                   │  (lectura/escritura bajo mutex)             │
+│                   │                                             │
+│  ┌────────────────v──────┐  ┌──────────────────┐              │
+│  │  HiloSignal (100Hz)   │  │  HiloPID(100Hz)  │              │
+│  │  genera ref           │  │  controla planta │              │
+│  │  lee: signal_type     │  │  lee: e,kp,ki,kd│              │
+│  │  escribe: ref         │  │  escribe: u      │              │
+│  └───────────────────────┘  └──────────────────┘              │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │    HiloReceptor (50Hz)         HiloTransmisor (50Hz)     │  │
+│  │                                                           │  │
+│  │  Lee desde IPC:          Escribe hacia IPC:              │  │
+│  │  ParamsMessage           DataMessage                     │  │
+│  │  (Kp, Ki, Kd)           (ref, u, yk, tiempo)            │  │
+│  │                                                           │  │
+│  │  Actualiza:              Lee:                            │  │
+│  │  ParametrosCompartidos   VariablesCompartidas            │  │
+│  └────────┬───────────────────────────────┬─────────────────┘  │
+│           │                               │                    │
+│           └──────────────┬────────────────┘                    │
+│                          │                                     │
+└──────────────────────────┼─────────────────────────────────────┘
+                           │
+                POSIX Message Queues
+                           │
+        ┌──────────────────┴──────────────────┐
+        │                                     │
+        v                                     v
+┌──────────────────┐              ┌──────────────────┐
+│   /data_queue    │              │ /params_queue    │
+│  (DataMessage)   │              │(ParamsMessage)   │
+└──────────┬───────┘              └────────┬─────────┘
+           │                               │
+           v                               v
+    (gui_app recibe)                (gui_app envía)
+    Visualización en vivo           Controles de usuario
+```
+
+#### 3.5 Flujos de Datos Detallados
+
+**Flujo de Envío de Datos a GUI:**
+```cpp
+HiloTransmisor (cada 20ms @ 50Hz)
+    │
+    ├─ Lee {vars->ref, vars->u, vars->yk, tiempo} con lock(vars.mtx)
+    │
+    └─ Transmisor::enviar()
+         │
+         ├─ Serializa en DataMessage (57 bytes, sin padding)
+         │
+         └─ mq_send() a /data_queue (no-bloqueante)
+              │
+              └─ GUI (gui_app) recibe bloqueante en hilo de comunicación
+                   │
+                   └─ Visualiza en gráficos en tiempo real
+```
+
+**Flujo de Cambio de Parámetros:**
+```cpp
+GUI (usuario ajusta Kp slider)
+    │
+    └─ Construye ParamsMessage (Kp_nuevo, Ki, Kd, setpoint)
+         │
+         └─ mq_send() a /params_queue
+              │
+              └─ HiloReceptor recibe en simulador
+                   │
+                   ├─ Receptor::recibir() deserializa
+                   │
+                   └─ Escribe en ParametrosCompartidos con lock(params.mtx)
+                        │
+                        └─ HiloPID lee parámetros actualizados cada ciclo
+                             │
+                             └─ Próximo ciclo usa kp_nuevo
+```
+
+#### 3.6 Serialización Manual sin Padding
+
+```cpp
+// comm.cpp implementa serialización manual
+// Evita padding de compilador para portabilidad entre procesos
+
 struct DataMessage {
-    uint32_t sequence;
-    double time;
-    double setpoint;
-    double output;
-    double control;
-    double error;
+    double values[6];           // 6 * 8 = 48 bytes
+    double timestamp;           // 8 bytes
+    uint8_t num_values;         // 1 byte
+    // Total: 57 bytes (sin gaps)
 };
 
 struct ParamsMessage {
-    double Kp;
-    double Ki;
-    double Kd;
-    double setpoint;
+    double Kp, Ki, Kd;          // 3 * 8 = 24 bytes
+    double setpoint;            // 8 bytes
+    uint8_t signal_type;        // 1 byte
+    uint32_t timestamp;         // 4 bytes
+    // Total: 37 bytes
 };
 ```
 
-**Responsabilidades**:
-- Serialización/deserialización manual (sin padding)
-- Gestión de colas POSIX (`/data_queue`, `/params_queue`)
-- Manejo de errores de comunicación
+**Serialización (escribir en buffer):**
+```cpp
+size_t offset = 0;
+memcpy(buffer + offset, &msg.Kp, sizeof(double)); offset += sizeof(double);
+memcpy(buffer + offset, &msg.Ki, sizeof(double)); offset += sizeof(double);
+// ... continuar para cada campo
+```
+
+**Deserialización (leer de buffer):**
+```cpp
+size_t offset = 0;
+memcpy(&msg.Kp, buffer + offset, sizeof(double)); offset += sizeof(double);
+// ... espejo de serialización
+```
+
+#### 3.7 Protocolo de Comunicación
+
+**Queue Names:**
+- `/data_queue`: Datos del simulador → GUI (muestreo continuo)
+- `/params_queue`: Parámetros de GUI → Simulador (eventos discretos)
+
+**Propiedades:**
+- **mq_send()** (desde simulador): No-bloqueante, descarta si cola llena
+- **mq_receive()** (en GUI): Bloqueante, espera próximo mensaje
+- **Tamaño de cola**: Típicamente 10-50 mensajes
+- **Prioridad**: Modo FIFO (First In First Out)
 
 ```cpp
 ┌────────────────────────────────────────┐

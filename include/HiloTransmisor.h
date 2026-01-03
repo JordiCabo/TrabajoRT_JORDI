@@ -1,22 +1,12 @@
-/*
+/**
  * @file HiloTransmisor.h
+ * @brief Threading para envío periódico de datos de control via IPC
+ * @author Jordi + GitHub Copilot
+ * @date 2026-01-03
  * 
- * @author Jordi
- * @author GitHub Copilot (asistencia)
- * 
- * @brief Wrapper de threading para transmisión IPC periódica
- * 
- * Ejecuta el método enviar() de un Transmisor en un hilo pthread
- * a frecuencia fija, permitiendo envío periódico de datos de control
- * sin bloquear el hilo principal.
- * 
- * Uso típico:
- *   VariablesCompartidas vars;
- *   Transmisor tx(&vars);
- *   tx.inicializar();
- *   HiloTransmisor hiloTx(&tx, &vars.running, &vars.mtx, 50.0); // 50 Hz
- *   // El hilo envía automáticamente a 50 Hz
- *   vars.running = false; // Detener
+ * Implementa un hilo POSIX que ejecuta el envío de datos de control
+ * hacia la mqueue a una frecuencia configurable, permitiendo visualización
+ * en tiempo real sin bloquear el lazo de control.
  */
 
 #ifndef HILO_TRANSMISOR_H
@@ -27,20 +17,61 @@
 
 /**
  * @class HiloTransmisor
- * @brief Ejecuta transmisión IPC periódica en hilo separado
+ * @brief Hilo dedicado para envío periódico de datos de control via IPC
  * 
- * Envuelve un objeto Transmisor y lo ejecuta en un hilo pthread
- * a frecuencia configurable. Sincroniza el acceso mediante el
- * mutex compartido.
+ * Ejecuta un objeto Transmisor en un hilo pthread separado a frecuencia fija.
+ * Esto permite que la GUI reciba muestras en tiempo real del comportamiento
+ * del lazo de control sin interferir con la ejecución de los sistemas.
+ * 
+ * Diagrama de flujo:
+ * @verbatim
+ *   Control (control_simulator)       GUI (gui_app)
+ *        │                              │
+ *        ├─ VariablesCompartidas       │
+ *        │  (ref, u, yk)               │
+ *        │     │                        │
+ *        │     v                        │
+ *        │  HiloTransmisor              │
+ *        │     │                        │
+ *        │     └─> Transmisor::enviar() │
+ *        │           │                  │
+ *        │           v                  │
+ *        │         mqueue ─────> DataMessage
+ *        │           │                  │
+ *        │           │            Recibir & Visualizar
+ * @endverbatim
+ * 
+ * Patrón de uso (en control_simulator):
+ * @code{.cpp}
+ * VariablesCompartidas vars;
+ * Transmisor tx(&vars);
+ * if (tx.inicializar()) {
+ *     pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+ *     
+ *     HiloTransmisor hiloTx(&tx, &vars.running, &mtx, 50.0);  // 50 Hz
+ *     
+ *     // El hilo envía datos automáticamente
+ *     // GUI recibe a través de recepción bloqueante
+ *     vars.running = false; // Señal para detener
+ * }
+ * @endcode
+ * 
+ * @invariant frequency_ > 0 (Hz)
+ * @invariant El hilo solo ejecuta transmisor->enviar() mientras *running_ == true
  */
 class HiloTransmisor {
 public:
     /**
-     * @brief Constructor que crea e inicia el hilo
-     * @param transmisor Puntero al transmisor a ejecutar
-     * @param running Puntero al flag de ejecución (bajo mutex)
-     * @param mtx Puntero al mutex compartido POSIX
-     * @param frequency Frecuencia de envío en Hz
+     * @brief Constructor que crea e inicia el hilo de envío
+     * 
+     * @param transmisor Puntero al objeto Transmisor inicializado
+     * @param running Puntero a variable booleana de control
+     * @param mtx Puntero al mutex POSIX compartido
+     * @param frequency Frecuencia de envío en Hz (período = 1/frequency)
+     * 
+     * @note El hilo comienza a ejecutarse inmediatamente
+     * @note El Transmisor debe estar ya inicializado antes de pasar a este constructor
+     * @note La frecuencia típicamente es menor que la del lazo (para no saturar mqueue)
      */
     HiloTransmisor(Transmisor* transmisor, bool* running, 
                    pthread_mutex_t* mtx, double frequency);

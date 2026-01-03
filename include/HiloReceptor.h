@@ -1,22 +1,12 @@
-/*
+/**
  * @file HiloReceptor.h
+ * @brief Threading para recepción periódica de parámetros via IPC
+ * @author Jordi + GitHub Copilot
+ * @date 2026-01-03
  * 
- * @author Jordi
- * @author GitHub Copilot (asistencia)
- * 
- * @brief Wrapper de threading para recepción IPC periódica
- * 
- * Ejecuta el método recibir() de un Receptor en un hilo pthread
- * a frecuencia fija, permitiendo recepción periódica de parámetros
- * sin bloquear el hilo principal.
- * 
- * Uso típico:
- *   ParametrosCompartidos params;
- *   Receptor rx(&params);
- *   rx.inicializar();
- *   HiloReceptor hiloRx(&rx, &running, &mtx, 50.0); // 50 Hz
- *   // El hilo recibe automáticamente a 50 Hz
- *   running = false; // Detener
+ * Implementa un hilo POSIX que ejecuta la recepción de parámetros
+ * desde la mqueue a una frecuencia configurable, desacoplando el
+ * proceso IPC de la ejecución del lazo de control.
  */
 
 #ifndef HILO_RECEPTOR_H
@@ -27,20 +17,54 @@
 
 /**
  * @class HiloReceptor
- * @brief Ejecuta recepción IPC periódica en hilo separado
+ * @brief Hilo dedicado para recepción periódica de parámetros via IPC
  * 
- * Envuelve un objeto Receptor y lo ejecuta en un hilo pthread
- * a frecuencia configurable. Sincroniza el acceso mediante el
- * mutex compartido.
+ * Ejecuta un objeto Receptor en un hilo pthread separado a frecuencia fija.
+ * Esto permite que la GUI pueda enviar actualizaciones de parámetros que se
+ * reciben periódicamente sin bloquear el lazo de control principal.
+ * 
+ * Diagrama de flujo:
+ * @verbatim
+ *   GUI (gui_app)                Control (control_simulator)
+ *        │                              │
+ *        ├─ ParamsMessage ─────> mqueue ─────> HiloReceptor
+ *        │                              │          │
+ *        │                              │          └─> Receptor::recibir()
+ *        │                              │                   │
+ *        │                              │                   v
+ *        │                              │          ParametrosCompartidos
+ *        │                              │          (lock → kp,ki,kd updated)
+ * @endverbatim
+ * 
+ * Patrón de uso (en control_simulator):
+ * @code{.cpp}
+ * ParametrosCompartidos params;
+ * Receptor rx(&params);
+ * if (rx.inicializar()) {
+ *     bool running = true;
+ *     pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+ *     
+ *     HiloReceptor hiloRx(&rx, &running, &mtx, 50.0);  // 50 Hz
+ *     
+ *     // El hilo recibe parámetros automáticamente
+ *     running = false; // Señal para detener
+ * }
+ * @endcode
+ * 
+ * @invariant frequency_ > 0 (Hz)
+ * @invariant El hilo solo ejecuta receptor->recibir() mientras *running_ == true
  */
 class HiloReceptor {
 public:
     /**
-     * @brief Constructor que crea e inicia el hilo
-     * @param receptor Puntero al receptor a ejecutar
-     * @param running Puntero al flag de ejecución (bajo mutex)
-     * @param mtx Puntero al mutex compartido POSIX
+     * @brief Constructor que crea e inicia el hilo de recepción
+     * 
+     * @param receptor Puntero al objeto Receptor inicializado
+     * @param running Puntero a variable booleana de control
+     * @param mtx Puntero al mutex POSIX compartido
      * @param frequency Frecuencia de recepción en Hz
+     * 
+     * @note El hilo comienza a ejecutarse inmediatamente
      */
     HiloReceptor(Receptor* receptor, bool* running, 
                  pthread_mutex_t* mtx, double frequency);
