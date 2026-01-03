@@ -4,13 +4,13 @@
 
 **Autor**: Jordi  
 **Asistencia**: GitHub Copilot  
-**Fecha**: Diciembre 2024
+**Fecha**: Enero 2026
 
 ---
 
 ## Descripción General
 
-Framework de control de sistemas en tiempo real implementado en C++17. Proporciona una librería de sistemas discretos reutilizables (PID, funciones de transferencia, generadores de señal).
+Framework de control de sistemas en tiempo real implementado en C++17. Incluye librería core (PID, TF, SS, generadores de señal) y componentes IPC para sintonización en línea y visualización en GUI.
 
 ## Arquitectura de Lazo de Control Cerrado
 
@@ -77,6 +77,15 @@ Variables Compartidas (protegidas por std::mutex):
    • y(t)        : Salida de la planta
    • y_digital[k]: Salida del conversor A/D (retroalimentación)
 
+### Componentes IPC y sintonización en línea
+
+- **ParametrosCompartidos**: Kp, Ki, Kd, setpoint y selector de señal (`signal_type`) protegidos con mutex POSIX.
+- **VariablesCompartidas**: ref, e, u, ua, yk, ykd, running con mutex POSIX para el lazo principal.
+- **Receptor/HiloReceptor**: Reciben `ParamsMessage` desde `/params_queue` y actualizan `ParametrosCompartidos` periódicamente.
+- **Transmisor/HiloTransmisor**: Envían `DataMessage` a `/data_queue` con ref, u, yk y timestamp para la GUI.
+- **HiloPID**: Ejecuta PID leyendo parámetros dinámicamente en cada ciclo (sintonización en línea).
+- **SignalSwitch/HiloSwitch**: Multiplexa step/rampa/seno/PWM leyendo `signal_type` actualizado por la GUI.
+
 ### Flujo de Datos
 
 1. **Generador de Señales** (`SignalGenerator::Signal`)
@@ -137,6 +146,12 @@ DiscreteSystems::Hilo hilo_pid(&pid, &error, &control, &running, &mtx, 1000);
 DiscreteSystems::Hilo hilo_dac(&dac, &control, &control_analog, &running, &mtx, 1000);
 DiscreteSystems::Hilo hilo_planta(&planta, &control_analog, &plant_output, &running, &mtx, 1000);
 DiscreteSystems::Hilo hilo_adc(&adc, &plant_output, &feedback, &running, &mtx, 1000);
+
+// Hilos IPC opcionales (GUI en tiempo real)
+HiloSwitch hilo_ref(&signalSwitch, &ref, &running, &mtx, &params, 100);     // Referencia seleccionable
+HiloPID hilo_pid_dyn(&pid, &vars, &params, 100);                           // PID con Kp/Ki/Kd dinámicos
+HiloReceptor hilo_rx(&receptor, &running, &mtx, 50);                       // Recibe ParamsMessage
+HiloTransmisor hilo_tx(&transmisor, &running, &mtx, 50);                   // Envía DataMessage
 ```
 
 ## Componentes Principales
@@ -151,6 +166,9 @@ DiscreteSystems::Hilo hilo_adc(&adc, &plant_output, &feedback, &running, &mtx, 1
 - **DAConverter**: Retenedor de orden cero (ZOH)
 - **Sumador**: Bloque restador para cálculo de error
 - **Hilo/Hilo2in**: Wrappers pthread para ejecución en tiempo real
+- **HiloPID**: Wrapper especializado de PID con lectura dinámica de Kp/Ki/Kd
+- **HiloReceptor/HiloTransmisor**: Hilos periódicos para IPC (params/data)
+- **HiloSwitch**: Hilo para multiplexado dinámico de referencia
 
 ### Namespace SignalGenerator
 
@@ -160,6 +178,7 @@ DiscreteSystems::Hilo hilo_adc(&adc, &plant_output, &feedback, &running, &mtx, 1
 - **RampSignal**: Señal rampa
 - **PWMSignal**: Modulación por ancho de pulso
 - **HiloSignal**: Wrapper pthread para señales
+- **SignalSwitch**: Multiplexor de señales (step/rampa/seno/PWM)
 
 
 

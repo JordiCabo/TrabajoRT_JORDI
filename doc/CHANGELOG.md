@@ -8,10 +8,28 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ## [Unreleased]
 
 ### Añadido
-- Documentación completa del proyecto (README, CONTRIBUTING, CHANGELOG)
-- Comentarios Doxygen en todos los archivos `.h` y `.cpp`
-- Configuración Doxygen para generación de documentación HTML
-- Licencia MIT
+- (Pendiente)
+
+### Cambiado
+- (Pendiente)
+
+### Corregido
+- (Pendiente)
+
+## [1.1.0] - 2026-01-03
+
+### Añadido
+- Wrappers especializados: `HiloPID`, `HiloReceptor`, `HiloTransmisor`, `HiloSwitch`.
+- Componentes IPC thread-safe: `ParametrosCompartidos`, `VariablesCompartidas`, `Receptor`, `Transmisor`.
+- Multiplexor de señales `SignalSwitch` con selección dinámica desde GUI.
+- Nuevos tests IPC (`test_send`, `test_receive`, `testTransmisor`).
+
+### Cambiado
+- Documentación Doxygen y mainpage actualizadas a la arquitectura IPC actual.
+- README, ARCHITECTURE, INSTALL y CONTRIBUTING revisados con flujos IPC y sintonización en línea.
+
+### Corregido
+- Ajustes menores en comentarios y coherencia de nombres en headers IPC.
 
 ## [1.0.0] - 2024-12-18
 
@@ -85,6 +103,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - **Corregido** - para corrección de bugs
 - **Seguridad** - para vulnerabilidades
 
-[Unreleased]: https://github.com/USUARIO/PL7/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/USUARIO/PL7/compare/v0.1.0...v1.0.0
-[0.1.0]: https://github.com/USUARIO/PL7/releases/tag/v0.1.0
+[Unreleased]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v0.1.0...v1.0.0
+[0.1.0]: https://github.com/JordiCabo/TrabajoRT_JORDI/releases/tag/v0.1.0
