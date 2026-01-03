@@ -126,7 +126,64 @@ git commit -m "feat: añadir nueva funcionalidad X"
 git push origin feature/mi-feature
 ```
 
-## 📝 Estándares de Código
+## 🌟 Arquitectura y Patrones Clave
+
+### Entender el Diseño IPC
+
+El proyecto utiliza comunicación inter-procesos (IPC) con POSIX message queues:
+
+```cpp
+// Simulador (control_simulator)
+ParametrosCompartidos params;       // Thread-safe con mutex POSIX
+VariablesCompartidas vars;
+
+HiloReceptor rx(&receptor, &running, &mtx, 50);    // Recibe parámetros
+HiloTransmisor tx(&transmisor, &running, &mtx, 50); // Envía datos
+
+// GUI (gui_app)
+// Envía ParamsMessage a /params_queue
+// Recibe DataMessage de /data_queue
+```
+
+### Patrones Implementados
+
+1. **Non-Virtual Interface (NVI)**: `DiscreteSystem::next()` garantiza almacenamiento
+2. **Strategy Pattern**: `SignalGenerator` permite intercambiar señales
+3. **Dependency Injection**: Hilos reciben sistemas como parámetros
+4. **RAII**: Threads automáticamente joined en destructor
+5. **Template Method**: Clase base define flujo, subclases implementan detalles
+
+### Guía para Extender Componentes IPC
+
+Si añades nuevo componente de comunicación:
+
+```cpp
+// include/MiComponente.h
+class MiComponente {
+public:
+    bool inicializar();     // Conecta a mqueue
+    bool enviar();          // O recibir() según sea
+    void cerrar();          // Desconecta
+    
+private:
+    std::unique_ptr<MQueueComm> comm_;
+    bool inicializado_;
+};
+
+// Crear HiloMiComponente para threading periódico
+class HiloMiComponente {
+public:
+    HiloMiComponente(MiComponente* comp, bool* running,
+                     pthread_mutex_t* mtx, double frequency);
+    ~HiloMiComponente();
+    
+private:
+    static void* threadFunc(void* arg);
+    void run();
+};
+```
+
+## 📝 Estándares de Código para IPC
 
 ### C++17
 
@@ -189,16 +246,37 @@ protected:
 };
 ```
 
-### Smart Pointers
+### Sincronización Segura con Mutex POSIX
 
 ```cpp
-// ✅ CORRECTO: Usa smart pointers
-auto signal = std::make_shared<Signal>(Ts);
-std::unique_ptr<DiscreteSystem> system(new PIDController(Kp, Ki, Kd, Ts));
+// ✅ CORRECTO: Proteger acceso a ParametrosCompartidos
+{
+    std::lock_guard<pthread_mutex_t> lock(params->mtx);
+    double current_kp = params->kp;
+    params->kp = new_value;
+}
 
-// ❌ INCORRECTO: Evita punteros crudos para ownership
-Signal* signal = new Signal(Ts);
-delete signal;  // Propenso a memory leaks
+// ❌ INCORRECTO: Acceso sin protección
+double kp = params->kp;  // Carrera de datos posible
+```
+
+### Serialización Manual IPC
+
+```cpp
+// ✅ CORRECTO: Sin padding (portable)
+struct DataMessage {
+    double values[6];       // 48 bytes
+    double timestamp;       // 8 bytes
+    uint8_t num_values;     // 1 byte
+    // Total: 57 bytes exacto
+};
+
+// ❌ INCORRECTO: Con padding implícito
+struct BadMessage {
+    uint8_t flag;           // 1 byte
+    double value;           // 8 bytes (padding: 7 bytes!)
+    // Total: 16 bytes (se pierden 7 bytes)
+};
 ```
 
 ### Comentarios Doxygen
@@ -304,6 +382,49 @@ int main() {
 }
 ```
 
+### Testing de Componentes IPC
+
+Para probar nuevos componentes IPC (Receptor, Transmisor, etc.):
+
+```cpp
+// test/testMiReceptor.cpp
+#include "../include/Receptor.h"
+#include "../include/ParametrosCompartidos.h"
+#include <iostream>
+#include <thread>
+#include <chrono>
+
+int main() {
+    ParametrosCompartidos params;
+    Receptor receptor(&params);
+    
+    // Inicializar comunicación
+    if (!receptor.inicializar()) {
+        std::cerr << "Failed to initialize receiver" << std::endl;
+        return 1;
+    }
+    
+    // Test: recibir mensaje (requiere envío desde otro proceso)
+    // std::thread sender(testSendMessage);
+    // receptor.recibir();
+    // sender.join();
+    
+    receptor.cerrar();
+    std::cout << "IPC test passed!" << std::endl;
+    return 0;
+}
+```
+
+### Verificar Funcionamiento de IPC
+
+```bash
+# Terminal 1: Test receptor
+./Interfaz_Control/bin/test_receive
+
+# Terminal 2: Test transmisor
+./Interfaz_Control/bin/test_send
+```
+
 ### Ejecutar Tests
 
 ```bash
@@ -387,14 +508,51 @@ Antes de enviar tu PR, verifica:
 - [ ] Código formateado con `clang-format`
 - [ ] No hay conflictos con `main`
 
-## 🎓 Filosofía del Pracadémico** (Trabajo Final de Sistemas en Tiempo Real). Al contribuir, considera:
+## 🎓 Filosofía de Contribución
 
-- **Claridad sobre complejidad**: El código debe ser profesional pero comprensible
-- **Mejores prácticas**: Aplicación de patrones de diseño y buenas prácticas de C++17
-- **Claridad sobre complejidad**: El código debe ser entendible para estudiantes
-- **Patrones pedagógicos**: Usa patrones que enseñen buenas prácticas
-- **Documentación exhaustiva**: Explica el "por qué", no solo el "qué"
-- **Ejemplos prácticos**: Incluye ejemplos de uso reales
+Este es un **Trabajo Final Académico** (Trabajo Final de Sistemas en Tiempo Real). Al contribuir, considera:
+
+- **Claridad pedagógica**: El código enseña buenas prácticas, no solo resuelve problemas
+- **Comentarios exhaustivos**: Explica el "por qué" especialmente en temas avanzados (threading, IPC)
+- **Patrones demostrativos**: Usa patrones de diseño que sean educativos
+- **Testing completo**: Los tests sirven como ejemplos de uso
+- **Documentación abundante**: Doxygen comments para API pública
+- **Ejemplos prácticos**: Incluye ejemplos de uso reales en comentarios
+- **Considera futuras iteraciones**: El código debe ser extensible para asignaturas posteriores
+
+### Consideraciones Especiales para Componentes de Tiempo Real
+
+Si contribuyes código de threading o IPC:
+
+1. **Documen ta el patrón de sincronización**: Explica por qué se usa ese mutex
+2. **Describe posibles deadlocks**: Aunque sea uno solo, menciona cómo evitarlo
+3. **Discute tradeoffs**: ¿Qué ganas y qué pierdes con este diseño?
+4. **Proporciona ejemplos thread-safe**: Muestra cómo usar la clase de forma segura
+5. **Test bajo contención**: Verifica que funciona con múltiples threads
+
+Ejemplo de contribución educativa:
+
+```cpp
+/**
+ * @brief Sincronización de acceso a parámetros compartidos
+ * 
+ * Este método demuestra el patrón RAII con std::lock_guard para
+ * garantizar la liberación del mutex incluso si se lanza excepción.
+ * 
+ * @param kp Nueva ganancia proporcional
+ * 
+ * @note Patrón pedagógico: muestra cómo evitar deadlocks
+ * @warning Si se mantiene el lock durante cálculos, se reducirá paralelismo
+ * 
+ * @code{.cpp}
+ * {
+ *     std::lock_guard<pthread_mutex_t> lock(params->mtx);
+ *     params->kp = 1.5;  // Acceso seguro
+ * }  // Lock liberado automáticamente aquí
+ * @endcode
+ */
+void setKp(double kp);
+```
 
 ## 💬 ¿Preguntas?
 

@@ -142,14 +142,71 @@ Una vez instaladas las dependencias:
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/USUARIO/PL7.git
-cd PL7
+git clone https://github.com/JordiCabo/TrabajoRT_JORDI.git
+cd TrabajoRT_JORDI
 
 # Compilar librería core
 mkdir -p build && cd build
 cmake ..
 make -j$(nproc)  # Compilación paralela
 cd ..
+
+# (Opcional) Compilar GUI y simulador IPC
+cd Interfaz_Control
+./build.sh  # Script que compila el proyecto Qt6
+cd ..
+```
+
+### Opciones de Compilación
+
+```bash
+# Build con debug (símbolos, sin optimización)
+cd build
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+make
+
+# Build con optimización (release, recomendado)
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j$(nproc)
+
+# Build con símbolos y optimización
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+make -j$(nproc)
+```
+
+### Verificar Instalación de Dependencias para IPC
+
+Si vas a usar los componentes IPC (Receptor, Transmisor, HiloReceptor, HiloTransmisor):
+
+```bash
+# Verificar que /dev/mqueue existe
+ls -la /dev/mqueue/
+
+# Si no existe, crear
+sudo mkdir -p /dev/mqueue
+sudo mount -t mqueue none /dev/mqueue
+
+# Hacer permanente (opcional)
+echo "none /dev/mqueue mqueue defaults 0 0" | sudo tee -a /etc/fstab
+```
+
+### Dependencias para GUI Qt6 (Interfaz_Control)
+
+El componente Interfaz_Control requiere Qt6:
+
+**Ubuntu 22.04+:**
+```bash
+sudo apt-get install -y qt6-base-dev qt6-charts-dev libqt6core6
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S qt6-base qt6-charts
+```
+
+**Fedora:**
+```bash
+sudo dnf install -y qt6-qtbase-devel qt6-qtcharts-devel
 ```
 
 ## ✅ Verificación de Instalación
@@ -242,13 +299,35 @@ target_link_libraries(tu_ejecutable PRIVATE pthread)
 
 ### Error: "/dev/mqueue/ not available"
 
+Este error aparece si intentas usar los componentes IPC:
+
 ```bash
 # Montar filesystem de message queues
 sudo mkdir -p /dev/mqueue
 sudo mount -t mqueue none /dev/mqueue
 
-# Hacer permanente (añadir a /etc/fstab)
+# Hacer permanente (editar /etc/fstab)
 echo "none /dev/mqueue mqueue defaults 0 0" | sudo tee -a /etc/fstab
+
+# Verificar
+ls -la /dev/mqueue/
+```
+
+### Error: Qt6 not found (al compilar Interfaz_Control)
+
+```bash
+# Ubuntu/Debian: Instalar Qt6
+sudo apt-get install -y qt6-base-dev qt6-charts-dev
+
+# Arch Linux
+sudo pacman -S qt6-base qt6-charts
+
+# Fedora
+sudo dnf install -y qt6-qtbase-devel qt6-qtcharts-devel
+
+# Recompila
+cd Interfaz_Control
+./build.sh
 ```
 
 ### Warning: "Command line option '-std=c++17' is valid for C++/ObjC++"
