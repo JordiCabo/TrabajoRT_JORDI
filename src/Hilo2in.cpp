@@ -6,6 +6,7 @@
  */
 
 #include "Hilo2in.h"
+#include <csignal>
 
 namespace DiscreteSystems {
 
@@ -68,7 +69,7 @@ void Hilo2in::run() {
         pthread_mutex_unlock(mtx_);
 
         if (!isRunning)
-            break; // salir del bucle si running_ es false
+            break; // salir si se recibió SIGINT/SIGTERM o running_ es false
 
         double in1, in2;
         pthread_mutex_lock(mtx_);
@@ -85,8 +86,7 @@ void Hilo2in::run() {
         usleep(sleep_us);
     }
 
-    int* retVal = new int(0); // valor de retorno opcional
-    pthread_exit(retVal);
+    pthread_exit(nullptr);
 }
 
 } // namespace DiscreteSystems

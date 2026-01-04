@@ -10,6 +10,7 @@
 #include "HiloTransmisor.h"
 #include <unistd.h>
 #include <iostream>
+#include <csignal>
 
 /**
  * @brief Constructor que crea e inicia el hilo pthread
@@ -54,7 +55,7 @@ void HiloTransmisor::run() {
         pthread_mutex_unlock(mtx_);
 
         if (!isRunning)
-            break; // salir del bucle si running es false
+            break; // salir si se recibió SIGINT/SIGTERM o running es false
 
         // Enviar datos (transmisor ya maneja el mutex internamente)
         if (!transmisor_->enviar()) {
@@ -65,6 +66,5 @@ void HiloTransmisor::run() {
         usleep(sleep_us);
     }
 
-    int* retVal = new int(0);
-    pthread_exit(retVal);
+    pthread_exit(nullptr);
 }

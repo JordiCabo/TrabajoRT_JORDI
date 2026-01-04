@@ -8,6 +8,7 @@
 #include "../include/HiloPID.h"
 #include "../include/PIDController.h"
 #include <ctime>
+#include <csignal>
 
 namespace DiscreteSystems {
 
@@ -72,12 +73,13 @@ void HiloPID::run() {
     PIDController* pid = dynamic_cast<PIDController*>(system_);
     
     while (true) {
-        // 1. Verificar si debe seguir ejecutando
+        // Verificar si debe seguir ejecutando
         pthread_mutex_lock(&vars_->mtx);
         bool running = vars_->running;
         pthread_mutex_unlock(&vars_->mtx);
         
-        if (!running) break;
+        if (!running)
+            break; // salir si se recibió SIGINT/SIGTERM o running es false
 
         // 2. Leer parámetros dinámicos (kp, ki, kd) con su propio mutex
         pthread_mutex_lock(&params_->mtx);
@@ -103,8 +105,7 @@ void HiloPID::run() {
         iterations_++;
     }
 
-    int* retVal = new int(0);
-    pthread_exit(&retVal);
+    pthread_exit(nullptr);
 }
 
 

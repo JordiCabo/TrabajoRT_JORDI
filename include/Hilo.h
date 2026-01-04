@@ -13,7 +13,22 @@
 #include <iostream>
 #include <unistd.h>
 #include <mutex>
+#include <csignal>
 #include "DiscreteSystem.h"
+
+// Variable de control global para manejo de señales SIGINT/SIGTERM
+extern volatile sig_atomic_t g_signal_run;
+
+/**
+ * @brief Manejador de señal para SIGINT (Ctrl+C) y SIGTERM (kill)
+ * @param sig Número de señal recibida
+ */
+void manejador_signal(int sig);
+
+/**
+ * @brief Instala el manejador de señales para SIGINT y SIGTERM
+ */
+void instalar_manejador_signal();
 
 namespace DiscreteSystems {
 
@@ -47,7 +62,7 @@ namespace DiscreteSystems {
 class Hilo {
 public:
     /**
-     * @brief Constructor que inicia la ejecución del hilo
+     * @brief Constructor que inicia la ejecución del hilo e instala el manejador de señales
      * 
      * @param system Puntero al sistema discreto a ejecutar (PID, función de transferencia, etc.)
      * @param input Puntero a la variable de entrada del sistema

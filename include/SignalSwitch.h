@@ -45,22 +45,22 @@ public:
      * @brief Constructor del multiplexor de señales
      * 
      * @param stepSignal Puntero a señal de escalón
-     * @param sineSignal Puntero a señal senoidal
      * @param pwmSignal Puntero a señal PWM
-     * @param initialSelector Selector inicial (0=step, 1=sine, 2=pwm)
+     * @param sineSignal Puntero a señal senoidal
+     * @param initialSelector Selector inicial (0=step, 1=pwm, 2=sine)
      * 
      * @throw std::invalid_argument si alguna señal es nullptr
      * @throw std::invalid_argument si initialSelector no está en [1,3]
      */
     SignalSwitch(std::shared_ptr<StepSignal> stepSignal,
-                 std::shared_ptr<SineSignal> sineSignal,
                  std::shared_ptr<PwmSignal> pwmSignal,
-                 int initialSelector = 1);
+                 std::shared_ptr<SineSignal> sineSignal,
+                 int initialSelector = 0);
 
     /**
      * @brief Actualiza el selector de señal
      * 
-     * @param selector Índice de selección (0=step, 1=sine, 2=pwm)
+     * @param selector Índice de selección (0=step, 1=pwm, 2=sine)
      * @throw std::invalid_argument si selector no está en [0,2]
      */
     void setSelector(int selector);
@@ -94,8 +94,8 @@ public:
      * 
      * Lee el selector y delega al método next() de la señal correspondiente:
      * - selector_ == 0 → stepSignal_->next()
-     * - selector_ == 1 → sineSignal_->next()
-     * - selector_ == 2 → pwmSignal_->next()
+     * - selector_ == 1 → pwmSignal_->next()
+     * - selector_ == 2 → sineSignal_->next()
      * 
      * @return Valor de la muestra actual de la señal seleccionada
      */

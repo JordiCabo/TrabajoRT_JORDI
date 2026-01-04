@@ -13,9 +13,13 @@
 #include <iostream>
 #include <unistd.h>
 #include <mutex>
+#include <csignal>
 #include "DiscreteSystem.h"
 #include "VariablesCompartidas.h"
 #include "ParametrosCompartidos.h"
+
+// Variable de control global para manejo de señales
+extern volatile sig_atomic_t g_signal_run;
 
 namespace DiscreteSystems {
 

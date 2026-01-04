@@ -13,7 +13,11 @@
 #define HILO_RECEPTOR_H
 
 #include <pthread.h>
+#include <csignal>
 #include "Receptor.h"
+
+// Variable de control global para manejo de señales
+extern volatile sig_atomic_t g_signal_run;
 
 /**
  * @class HiloReceptor

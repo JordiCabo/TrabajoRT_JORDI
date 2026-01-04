@@ -6,6 +6,7 @@
  */
 
 #include "HiloSignal.h"
+#include <csignal>
 
 namespace SignalGenerator {
 
@@ -63,14 +64,13 @@ void HiloSignal::run() {
     int sleep_us = static_cast<int>(1e6 / frequency_); // periodo real del hilo
 
     while (true) {
-
         bool isRunning;
         pthread_mutex_lock(mtx_);
         isRunning = *running_;
         pthread_mutex_unlock(mtx_);
 
         if (!isRunning)
-            break;
+            break; // salir si se recibió SIGINT/SIGTERM o running es false
 
         // Generar siguiente muestra de la señal
         double y = signal_->next();
@@ -83,8 +83,7 @@ void HiloSignal::run() {
         usleep(sleep_us);
     }
 
-    int* retVal = new int(0);
-    pthread_exit(retVal);
+    pthread_exit(nullptr);
 }
 
 } // namespace SignalGenerator

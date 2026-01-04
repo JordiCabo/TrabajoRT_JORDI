@@ -12,7 +12,11 @@
 #include <pthread.h>
 #include <mutex>
 #include <unistd.h>
+#include <csignal>
 #include "SignalGenerator.h"
+
+// Variable de control global para manejo de señales
+extern volatile sig_atomic_t g_signal_run;
 
 namespace SignalGenerator {
 

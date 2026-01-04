@@ -10,10 +10,11 @@
 namespace DiscreteSystems {
 
 /**
- * @brief Constructor que crea e inicia el hilo pthread
+ * @brief Constructor que crea e inicia el hilo pthread e instala el manejador de señales
  * 
  * Crea un nuevo hilo pthread que ejecutará la función threadFunc,
  * iniciando la simulación del sistema a la frecuencia especificada.
+ * Instala automáticamente el manejador de señales SIGINT/SIGTERM.
  */
 Hilo::Hilo(DiscreteSystem* system, double* input, double* output, bool* running,pthread_mutex_t* mtx, double frequency)
     : system_(system), input_(input), output_(output), mtx_(mtx), frequency_(frequency),running_(running)  
@@ -65,8 +66,10 @@ void Hilo::run() {
         isRunning = *running_;
         pthread_mutex_unlock(mtx_);
 
-        if (!isRunning)
-            break; // salir del bucle si running_ es false
+        if (!isRunning) {
+            std::cerr << "[Hilo::run] Saliendo: isRunning=" << isRunning << std::endl;
+            break; // salir si se recibió SIGINT/SIGTERM o running_ es false
+        }
 
         double input;
         pthread_mutex_lock(mtx_);
@@ -83,8 +86,7 @@ void Hilo::run() {
         usleep(sleep_us);
     }
 
-    int* retVal = new int(0);
-    pthread_exit(&retVal);
+    pthread_exit(nullptr);
 }
 
 

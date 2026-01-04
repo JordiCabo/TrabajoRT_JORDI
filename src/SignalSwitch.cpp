@@ -12,12 +12,12 @@
 namespace SignalGenerator {
 
 SignalSwitch::SignalSwitch(std::shared_ptr<StepSignal> stepSignal,
-                           std::shared_ptr<SineSignal> sineSignal,
                            std::shared_ptr<PwmSignal> pwmSignal,
+                           std::shared_ptr<SineSignal> sineSignal,
                            int initialSelector)
     : stepSignal_(stepSignal)
-    , sineSignal_(sineSignal)
     , pwmSignal_(pwmSignal)
+    , sineSignal_(sineSignal)
     , selector_(initialSelector)
 {
     // Validar que las señales no sean nullptr
@@ -46,9 +46,9 @@ double SignalSwitch::next() {
         case 0:
             return stepSignal_->next();
         case 1:
-            return sineSignal_->next();
-        case 2:
             return pwmSignal_->next();
+        case 2:
+            return sineSignal_->next();
         default:
             throw std::logic_error("SignalSwitch::next: Selector inválido");
     }

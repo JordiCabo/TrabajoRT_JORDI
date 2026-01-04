@@ -10,6 +10,7 @@
 #include "HiloReceptor.h"
 #include <unistd.h>
 #include <iostream>
+#include <csignal>
 
 /**
  * @brief Constructor que crea e inicia el hilo pthread
@@ -54,7 +55,7 @@ void HiloReceptor::run() {
         pthread_mutex_unlock(mtx_);
 
         if (!isRunning)
-            break; // salir del bucle si running es false
+            break; // salir si se recibió SIGINT/SIGTERM o running es false
 
         // Recibir datos (receptor ya maneja el mutex internamente)
         receptor_->recibir(); // No reportar error si no hay mensaje
@@ -63,6 +64,5 @@ void HiloReceptor::run() {
         usleep(sleep_us);
     }
 
-    int* retVal = new int(0);
-    pthread_exit(retVal);
+    pthread_exit(nullptr);
 }

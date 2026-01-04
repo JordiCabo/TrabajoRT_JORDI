@@ -10,6 +10,7 @@
 #include "HiloSwitch.h"
 #include <unistd.h>
 #include <iostream>
+#include <csignal>
 
 /**
  * @brief Constructor que crea e inicia el hilo pthread
@@ -56,7 +57,7 @@ void HiloSwitch::run() {
         pthread_mutex_unlock(mtx_);
 
         if (!isRunning)
-            break; // salir del bucle si running es false
+            break; // salir si se recibió SIGINT/SIGTERM o running es false
 
         // Leer signal_type y setpoint de parámetros compartidos
         pthread_mutex_lock(&params_->mtx);
@@ -69,15 +70,16 @@ void HiloSwitch::run() {
         
         // Actualizar offset (setpoint) de la señal seleccionada antes de next()
         // El switch delega, así que actualizamos directamente en las señales
+        // Mapeo: 0=step, 1=pwm, 2=sine
         switch (signal_type) {
             case 0:
                 signalSwitch_->getStepSignal()->offset() = setpoint;
                 break;
             case 1:
-                signalSwitch_->getSineSignal()->offset() = setpoint;
+                signalSwitch_->getPwmSignal()->offset() = setpoint;
                 break;
             case 2:
-                signalSwitch_->getPwmSignal()->offset() = setpoint;
+                signalSwitch_->getSineSignal()->offset() = setpoint;
                 break;
         }
 
@@ -93,6 +95,5 @@ void HiloSwitch::run() {
         usleep(sleep_us);
     }
 
-    int* retVal = new int(0);
-    pthread_exit(retVal);
+    pthread_exit(nullptr);
 }

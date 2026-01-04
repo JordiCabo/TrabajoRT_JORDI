@@ -13,7 +13,11 @@
 #define HILO_TRANSMISOR_H
 
 #include <pthread.h>
+#include <csignal>
 #include "Transmisor.h"
+
+// Variable de control global para manejo de señales
+extern volatile sig_atomic_t g_signal_run;
 
 /**
  * @class HiloTransmisor

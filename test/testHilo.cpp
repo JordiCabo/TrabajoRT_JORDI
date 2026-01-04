@@ -20,6 +20,8 @@
 #include "HiloTransmisor.h"
 #include "Receptor.h"
 #include "HiloReceptor.h"
+#include "InterruptorArranque.h"
+#include "HiloIntArranque.h"
 
 using namespace DiscreteSystems;
 
@@ -28,9 +30,19 @@ using namespace DiscreteSystems;
  
 
 int main() {
-    // --- Variables compartidas ---
+    // --- Variablefalse;  // inicialmente en false
+    
+    // --- Crear InterruptorArranque y HiloIntArranque ---
+    InterruptorArranque interruptor;
+
+    // Activar running a través del interruptor
+    interruptor.setRun(1);
+
+    // Crear el hilo del interruptor de arranque/paro
+    HiloIntArranque hiloInterruptor(&interruptor, &vars.running, &vars.mtx);
+    
    
-    vars.running = true;  // inicializamos el flag
+    
 
   //-------------------------------------------------------------
   // --- Crear la referencia (SignalSwitch) -----------------------------------------
@@ -44,6 +56,7 @@ int main() {
     // Parámetros para el seno
     double freq = 1.0;           // frecuencia en Hz
     double phase = 0.0;          // fase en radianes
+    double sinAmp=10.0;
     
     // Parámetros para PWM
     double duty = 0.5;           // ciclo de trabajo
@@ -51,11 +64,11 @@ int main() {
 
     // Crear las 3 señales como shared_ptr
     auto stepSignal = std::make_shared<SignalGenerator::StepSignal>(Ts_signal, amplitude, step_time, offset);
-    auto sinSignal = std::make_shared<SignalGenerator::SineSignal>(Ts_signal, amplitude, freq, phase, offset);
+    auto sinSignal = std::make_shared<SignalGenerator::SineSignal>(Ts_signal, sinAmp, freq, phase, offset);
     auto pwmSignal = std::make_shared<SignalGenerator::PwmSignal>(Ts_signal, amplitude, duty, period_pwm, offset);
 
-    // Crear SignalSwitch (selector inicial = 1: escalón)
-    SignalGenerator::SignalSwitch signalSwitch(stepSignal, sinSignal, pwmSignal, 1);
+    // Crear SignalSwitch: 0=step, 1=pwm, 2=sine (selector inicial = 0: escalón)
+    SignalGenerator::SignalSwitch signalSwitch(stepSignal, pwmSignal, sinSignal, 0);
     
    
     
@@ -96,7 +109,7 @@ int main() {
     params.kp = 5.0;
     params.ki = 3.0;
     params.kd = 0.7;
-    params.setpoint = 80.0;  // igual a la amplitud del escalón
+    params.setpoint = 1.0;  // igual a la amplitud del escalón
     pthread_mutex_unlock(&params.mtx);
 
     double Ts_controller = 0.01;  // periodo de muestreo 0.01 s
@@ -151,6 +164,11 @@ int main() {
     // --- Bucle principal: monitorizar salida en tiempo real ---
     int k=0;
     while(true) {
+        bool running_now;
+        pthread_mutex_lock(&vars.mtx);
+        running_now = vars.running;
+        pthread_mutex_unlock(&vars.mtx);
+        if (!running_now) break;
         // Leer salida de la planta
         double yk;
         pthread_mutex_lock(&vars.mtx);
@@ -183,27 +201,21 @@ int main() {
         usleep(50000); // 50 ms entre impresiones
     }
 
-    // --- Indicar al hilo que termine ---
-    pthread_mutex_lock(&vars.mtx);
-    vars.running = false;
-    pthread_mutex_unlock(&vars.mtx);
+   
+
+    // --- Esperar terminación de todos los hilos ---
+    pthread_join(hiloRef.getThread(), nullptr);
+    pthread_join(hiloPlanta.getThread(), nullptr);
+    pthread_join(hiloAD.getThread(), nullptr);
+    pthread_join(hiloPID.getThread(), nullptr);
+    pthread_join(hiloDA.getThread(), nullptr);
+    pthread_join(hiloSumador.getThread(), nullptr);
+    pthread_join(hiloTransmisor.getThread(), nullptr);
+    pthread_join(hiloReceptor.getThread(), nullptr);
 
     // Cerrar transmisor y receptor
     transmisor.cerrar();
     receptor.cerrar();
-
-    // --- Recoger la terminación del hilo con pthread_join ---
-   void* statusVal;
-int rc = pthread_join(hiloPlanta.getThread(), &statusVal);
-if (rc != 0) {
-    std::cerr << "Error esperando al hilo: " << rc << std::endl;
-    return 1;
-}
-
-// Recuperar el valor devuelto por el hilo
-int* ret = static_cast<int*>(statusVal);
-std::cout << "Hilo terminó con valor: " << *ret << std::endl;
-delete ret; // liberar memoria
 
     return 0;
 }

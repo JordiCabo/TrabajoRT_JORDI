@@ -13,8 +13,12 @@
 #define HILO_SWITCH_H
 
 #include <pthread.h>
+#include <csignal>
 #include "SignalSwitch.h"
 #include "ParametrosCompartidos.h"
+
+// Variable de control global para manejo de señales
+extern volatile sig_atomic_t g_signal_run;
 
 /**
  * @class HiloSwitch
