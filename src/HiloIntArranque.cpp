@@ -14,8 +14,8 @@ void instalar_manejador_signal() {
     signal(SIGTERM, manejador_signal);
 }
 
-HiloIntArranque::HiloIntArranque(InterruptorArranque* interruptor, bool* running, pthread_mutex_t* mtx)
-    : interruptor_(interruptor), running_(running), mtx_(mtx)
+HiloIntArranque::HiloIntArranque(InterruptorArranque* interruptor, bool* running, pthread_mutex_t* mtx, double frequency)
+    : interruptor_(interruptor), running_(running), mtx_(mtx), frequency_(frequency)
 {
     g_running_ptr = running_;
     instalar_manejador_signal();
@@ -33,7 +33,7 @@ void* HiloIntArranque::threadFunc(void* arg) {
 }
 
 void HiloIntArranque::run() {
-    DiscreteSystems::Temporizador timer(10.0);  // Chequear cada 100ms (10 Hz)
+    DiscreteSystems::Temporizador timer(frequency_);
     
     while (true) {
         if (!g_signal_run) {

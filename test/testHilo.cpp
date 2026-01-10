@@ -33,28 +33,25 @@ using namespace DiscreteSystems;
 int main() {
     // --- Variablefalse;  // inicialmente en false
     
-    // --- Crear InterruptorArranque y HiloIntArranque ---
-    InterruptorArranque interruptor;
-
-    // Activar running a través del interruptor
-    interruptor.setRun(1);
-
-    // Crear el hilo del interruptor de arranque/paro
-    HiloIntArranque hiloInterruptor(&interruptor, &vars.running, &vars.mtx);
-    
-   
-    
-
     //-------------------------------------------------------------
-    // --- Frecuencias de muestreo --------------------------------
+    // ---------------- Frecuencias de muestreo -------------------
     //-------------------------------------------------------------
     const double Ts_controller = 0.01;          // período PID (s)
     const double Ts_component  = Ts_controller / 10.0; // resto de componentes
     const double freq_controller = 1.0 / Ts_controller; // Hz
     const double freq_component  = 1.0 / Ts_component;  // Hz
 
+    // --- Crear InterruptorArranque y HiloIntArranque ---
+    InterruptorArranque interruptor;
+
+    // Activar running a través del interruptor
+    interruptor.setRun(1);
+
+    // Crear el hilo del interruptor de arranque/paro (frecuencia de componentes)
+    HiloIntArranque hiloInterruptor(&interruptor, &vars.running, &vars.mtx, freq_component);
+
     //-------------------------------------------------------------
-    // --- Crear la referencia (SignalSwitch) ---------------------
+    // --------- Crear la referencia (SignalSwitch) ---------------
     //-------------------------------------------------------------
     // Parámetros del escalón
     double Ts_signal = Ts_component;     // período de muestreo común [s]
@@ -86,8 +83,8 @@ int main() {
   
   
     //-------------------------------------------------------------
-  // --- Crear la planta -----------------------------------------
-  //---------------------------------------------------------------
+    // ---------------- Crear la planta ----------------------------
+    //---------------------------------------------------------------
     // Planta discretizada a Ts_component = 0.001 s (1 kHz)
     // Planta continua: 1 / (tau*s + 1)
     double tau = 1.0; // constante de tiempo [s]
@@ -104,13 +101,13 @@ int main() {
     TransferFunctionSystem planta(tf_disc.b, tf_disc.a, Ts_component, bufferSize);
 
     //-------------------------------------------------------------
-    // --- Crear hilo de la planta ---
+    // --------------- Crear hilo de la planta --------------------
     //-------------------------------------------------------------
     
     Hilo hiloPlanta(&planta, &vars.ua, &vars.yk,  &vars.running, &vars.mtx, frequency_plant);
 
     //-------------------------------------------------------------
-    //Crear ADConverter-----------------------------------------------
+    // ---------------- Crear ADConverter --------------------------
     //-------------------------------------------------------------
     double Ts_converter = Ts_component;  // período de muestreo
 
@@ -118,8 +115,8 @@ int main() {
     Hilo hiloAD(&ADconverter, &vars.yk, &vars.ykd, &vars.running, &vars.mtx, freq_component);
 
     //-------------------------------------------------------------
-// Crear PID-----------------------------------------------
-//-------------------------------------------------------------
+    // ---------------- Crear PID ----------------------------------
+    //-------------------------------------------------------------
 
     // Inicializar parámetros compartidos con valores por defecto
     pthread_mutex_lock(&params.mtx);
@@ -137,7 +134,7 @@ int main() {
     HiloPID hiloPID(&pid, &vars, &params, freq_controller);
 
     //-------------------------------------------------------------
-    //Crear DAConverter-----------------------------------------------
+    // ---------------- Crear DAConverter --------------------------
     //-------------------------------------------------------------
     
 
@@ -145,14 +142,16 @@ int main() {
     Hilo hiloDA(&DAconverter, &vars.u, &vars.ua, &vars.running, &vars.mtx, freq_component); 
   
     //-------------------------------------------------------------
-// Crear Sumador-----------------------------------------------
+    // ---------------- Crear Sumador ------------------------------
 //-------------------------------------------------------------
     
     double Ts_sumador = Ts_component;
     Sumador sumador(Ts_sumador);
     Hilo2in hiloSumador(&sumador, &vars.ref, &vars.ykd,  &vars.e, &vars.running, &vars.mtx, freq_component);
 
-    // --- Crear transmisor para enviar datos via IPC ---
+    //-------------------------------------------------------------
+    // -------- Crear transmisor para enviar datos via IPC --------
+    //-------------------------------------------------------------
     Transmisor transmisor(&vars);
     if (!transmisor.inicializar()) {
         std::cerr << "Error: No se pudo inicializar el Transmisor" << std::endl;
@@ -161,11 +160,13 @@ int main() {
     }
     std::cout << "Transmisor inicializado correctamente" << std::endl;
 
-    // --- Crear hilo de transmisión a 50 Hz ---
-    HiloTransmisor hiloTransmisor(&transmisor, &vars.running, &vars.mtx, 50.0);
-    std::cout << "Hilo de transmisión iniciado a 50 Hz" << std::endl;
+    // --- Crear hilo de transmisión a frecuencia de componentes ---
+    HiloTransmisor hiloTransmisor(&transmisor, &vars.running, &vars.mtx, freq_component);
+    std::cout << "Hilo de transmisión iniciado a " << freq_component << " Hz" << std::endl;
 
-    // --- Crear receptor para recibir parámetros via IPC ---
+    //-------------------------------------------------------------
+    // -------- Crear receptor para recibir parámetros via IPC -----
+    //-------------------------------------------------------------
     Receptor receptor(&params);
     if (!receptor.inicializar()) {
         std::cerr << "Error: No se pudo inicializar el Receptor" << std::endl;
@@ -174,11 +175,13 @@ int main() {
     }
     std::cout << "Receptor inicializado correctamente" << std::endl;
 
-    // --- Crear hilo de recepción a 50 Hz ---
-    HiloReceptor hiloReceptor(&receptor, &vars.running, &vars.mtx, 50.0);
-    std::cout << "Hilo de recepción iniciado a 50 Hz" << std::endl;
+    // --- Crear hilo de recepción a frecuencia de componentes ---
+    HiloReceptor hiloReceptor(&receptor, &vars.running, &vars.mtx, freq_component);
+    std::cout << "Hilo de recepción iniciado a " << freq_component << " Hz" << std::endl;
 
-    // --- Bucle principal: monitorizar salida en tiempo real ---
+    //-------------------------------------------------------------
+    // ---- Bucle principal: monitorizar salida en tiempo real ----
+    //-------------------------------------------------------------
     int k=0;
     while(true) {
         bool running_now;
@@ -220,7 +223,9 @@ int main() {
 
    
 
-    // --- Esperar terminación de todos los hilos ---
+    //-------------------------------------------------------------
+    // ------- Esperar terminación de todos los hilos -------------
+    //-------------------------------------------------------------
     pthread_join(hiloRef.getThread(), nullptr);
     pthread_join(hiloPlanta.getThread(), nullptr);
     pthread_join(hiloAD.getThread(), nullptr);
