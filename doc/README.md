@@ -14,9 +14,10 @@ Framework educativo de control de sistemas en tiempo real implementado en C++17.
 
 - 🎛️ **Controladores PID discretos** con sintonización en línea
 - 📊 **Sistemas en espacio de estados** y funciones de transferencia
+- 📐 **Discretizador continuo→discreto** por Tustin (bilineal) con `Discretizer`
 - 📡 **Generadores de señal** (escalón, rampa, senoidal, PWM)
-- 🧵 **Ejecución multihilo** con frecuencia configurable
--  **Convertidores A/D y D/A** simulados
+- 🧵 **Ejecución multihilo** con temporización absoluta (`Temporizador` + `clock_nanosleep`)
+- 🔄 **Convertidores A/D y D/A** simulados
 
 ## 🏗️ Arquitectura
 
@@ -50,6 +51,8 @@ Sistemas discretos C++17 reutilizables:
 - **TransferFunctionSystem**: Sistemas SISO con función de transferencia
 - **StateSpaceSystem**: Representación en espacio de estados
 - **SignalGenerator**: Señales de prueba (step, sine, ramp, PWM)
+- **Discretizer**: Bilineal (Tustin) de B(s)/A(s) a B(z)/A(z)
+- **Temporizador**: Temporización absoluta sobre `CLOCK_MONOTONIC`
 - **Hilo/Hilo2in/HiloSignal**: Ejecución pthread a frecuencia fija
 
 #### 2. Componentes IPC y Comunicación

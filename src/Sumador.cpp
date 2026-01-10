@@ -21,13 +21,7 @@ Sumador::Sumador(double Ts, size_t bufferSize)
 
 /**
  * @brief Calcula el error como diferencia entre referencia y realimentación
- * 
- * @param ref Valor de referencia deseada
- * @param y Valor medido real del sistema
- * @return Error e(k) = ref - y
- * 
- * Esta es la función correcta a utilizar; calcula directamente la diferencia
- * entre la referencia y la realimentación.
+ * Devuelve e(k) = ref - y.
  */
 double Sumador::compute(double ref, double y) {
     e_out_ = ref - y;
@@ -36,13 +30,9 @@ double Sumador::compute(double ref, double y) {
 
 /**
  * @brief Método compute() de una sola entrada (sobrecarga heredada)
- * 
- * @param uk Entrada única (no utilizada)
- * @return Nunca retorna
  * @throws std::runtime_error indicando que debe usarse compute(ref, y)
  * 
- * Esta función se implementa por la herencia de DiscreteSystem (virtual puro),
- * pero no es válida para el Sumador que requiere dos entradas independientes.
+ * Esta función existe por herencia, pero no es válida para Sumador (requiere 2 entradas).
  */
 double Sumador::compute(double) {
     throw std::runtime_error(

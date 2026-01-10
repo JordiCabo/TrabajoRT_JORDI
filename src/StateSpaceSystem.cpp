@@ -13,13 +13,6 @@ namespace DiscreteSystems {
 
 /**
  * @brief Constructor del sistema en espacio de estados
- * 
- * @param A Matriz de estado n×n
- * @param B Vector de entrada de tamaño n
- * @param C Vector de salida de tamaño n
- * @param D Ganancia directa (escalar)
- * @param Ts Período de muestreo en segundos
- * @param bufferSize Tamaño del buffer circular
  * @throws std::runtime_error si las dimensiones son inconsistentes
  * 
  * Valida que:
@@ -70,9 +63,6 @@ StateSpaceSystem::StateSpaceSystem(
 /**
  * @brief Calcula la salida y actualiza el estado del sistema
  * 
- * @param uk Entrada en el paso k
- * @return Salida y(k)
- * 
  * Implementa las ecuaciones:
  *   y(k) = C·x(k) + D·u(k)
  *   x(k+1) = A·x(k) + B·u(k)
@@ -119,10 +109,6 @@ void StateSpaceSystem::resetState()
 
 /**
  * @brief Sobrecarga del operador << para imprimir el sistema
- * 
- * @param os Stream de salida
- * @param sys Sistema a imprimir
- * @return Referencia al stream
  * 
  * Muestra las matrices A, B, C, D y el vector de estado x de forma
  * legible con formato alineado.

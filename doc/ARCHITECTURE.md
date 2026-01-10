@@ -13,8 +13,9 @@ Este documento describe la arquitectura de alto nivel del sistema de Control de 
 │  │                                                          │  │
 │  │  - DiscreteSystem (base NVI)                            │  │
 │  │  - PIDController, TransferFunctionSystem, etc.          │  │
+│  │  - Discretizer (Tustin bilineal)                        │  │
 │  │  - SignalGenerator (Step, Sine, Ramp, PWM)             │  │
-│  │  - Hilo/Hilo2in/HiloSignal (threading)                 │  │
+│  │  - Hilo/Hilo2in/HiloSignal + Temporizador (threading)  │  │
 │  │  - ADConverter/DAConverter/Sumador                      │  │
 │  │                                                          │  │
 │  │  Buffer circular | Patrón NVI | Tests unitarios        │  │
@@ -80,6 +81,7 @@ HiloSignal    // Generador de señal → 1 salida
 
 **Responsabilidades**:
 - Ejecutar sistemas a frecuencia fija (Hz)
+- Temporización absoluta mediante `Temporizador` (`clock_nanosleep` + `TIMER_ABSTIME`) para evitar drift
 - Sincronizar acceso con `std::mutex`
 - Gestión de lifecycle de threads (`pthread`)
 
@@ -92,29 +94,29 @@ Esta sección detalla cómo se sincronizan los hilos y cómo se realiza el acces
 - Se utiliza un `std::mutex` compartido entre todos los hilos (`Hilo`, `Hilo2in`, `HiloSignal`).
 - Los accesos a variables compartidas (`ref`, `error`, `u`, `u_analog`, `y`, `y_digital`, y `running`) se realizan exclusivamente dentro de regiones críticas protegidas mediante `std::lock_guard<std::mutex>`.
 - La computación del sistema (`system_->next(...)`) se ejecuta fuera de la sección crítica para minimizar el tiempo de bloqueo y evitar contención.
-- Cada hilo impone su período de muestreo mediante `usleep(period_us)`, donde `period_us = 1e6 / frequency_`.
+- Cada hilo impone su período de muestreo con temporización absoluta (`clock_nanosleep` + `TIMER_ABSTIME`) a través de `Temporizador`, eliminando drift acumulativo.
 
 ### Patrón de Acceso (canónico)
 
 ```cpp
-// Ejecución a frecuencia fija con acceso sincronizado
-int sleep_us = static_cast<int>(1e6 / frequency_);
+// Ejecución a frecuencia fija con acceso sincronizado y retardo absoluto
+Temporizador timer(frequency_); // frecuencia en Hz
 while (true) {
-        bool isRunning;
-        { std::lock_guard<std::mutex> lock(*mtx_); isRunning = *running_; }
-        if (!isRunning) break;
+    bool isRunning;
+    { std::lock_guard<std::mutex> lock(*mtx_); isRunning = *running_; }
+    if (!isRunning) break;
 
-        // Leer entradas bajo mutex (copiar a variables locales)
-        double in1, in2;
-        { std::lock_guard<std::mutex> lock(*mtx_); in1 = *input1_; in2 = *input2_; }
+    // Leer entradas bajo mutex (copiar a variables locales)
+    double in1, in2;
+    { std::lock_guard<std::mutex> lock(*mtx_); in1 = *input1_; in2 = *input2_; }
 
-        // Calcular salida fuera del lock
-        double y = system_->next(in1, in2);
+    // Calcular salida fuera del lock
+    double y = system_->next(in1, in2);
 
-        // Escribir salida bajo mutex
-        { std::lock_guard<std::mutex> lock(*mtx_); *output_ = y; }
+    // Escribir salida bajo mutex
+    { std::lock_guard<std::mutex> lock(*mtx_); *output_ = y; }
 
-        usleep(sleep_us);
+    timer.esperar(); // clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME)
 }
 ```
 

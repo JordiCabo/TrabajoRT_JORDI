@@ -22,6 +22,7 @@
 #include "HiloReceptor.h"
 #include "InterruptorArranque.h"
 #include "HiloIntArranque.h"
+#include "Discretizer.h"
 
 using namespace DiscreteSystems;
 
@@ -44,11 +45,19 @@ int main() {
    
     
 
-  //-------------------------------------------------------------
-  // --- Crear la referencia (SignalSwitch) -----------------------------------------
-  //---------------------------------------------------------------
-   // Parámetros del escalón
-    double Ts_signal = 0.01;     // período de muestreo común [s]
+    //-------------------------------------------------------------
+    // --- Frecuencias de muestreo --------------------------------
+    //-------------------------------------------------------------
+    const double Ts_controller = 0.01;          // período PID (s)
+    const double Ts_component  = Ts_controller / 10.0; // resto de componentes
+    const double freq_controller = 1.0 / Ts_controller; // Hz
+    const double freq_component  = 1.0 / Ts_component;  // Hz
+
+    //-------------------------------------------------------------
+    // --- Crear la referencia (SignalSwitch) ---------------------
+    //-------------------------------------------------------------
+    // Parámetros del escalón
+    double Ts_signal = Ts_component;     // período de muestreo común [s]
     double amplitude = 1.0;     // amplitud
     double step_time = 0.05;     // tiempo del escalón
     double offset = 0.0;         // desplazamiento vertical
@@ -73,18 +82,26 @@ int main() {
    
     
     // Crear HiloSwitch para ejecutar el switch periódicamente
-    HiloSwitch hiloRef(&signalSwitch, &vars.ref, &vars.running, &vars.mtx, &params, 1/Ts_signal);
+        HiloSwitch hiloRef(&signalSwitch, &vars.ref, &vars.running, &vars.mtx, &params, freq_component);
+  
   
     //-------------------------------------------------------------
   // --- Crear la planta -----------------------------------------
   //---------------------------------------------------------------
-    std::vector<double> b = {0.00995};
-    std::vector<double> a = {1.0, -0.99};
-    double frequency_plant = 100.0;  // Hz
+    // Planta discretizada a Ts_component = 0.001 s (1 kHz)
+    // Planta continua: 1 / (tau*s + 1)
+    double tau = 1.0; // constante de tiempo [s]
+    std::vector<double> num_s = {1.0};
+    std::vector<double> den_s = {tau, 1.0};
+
+    // Discretizar con Tustin al período Ts_component
+    auto tf_disc = discretizeTF(num_s, den_s, Ts_component, DiscretizationMethod::Tustin);
+
+    double frequency_plant = freq_component;  // Hz
     size_t bufferSize = 10;
 
-    //quitar la frecuencia de la planta, esto lo gestiona el hilo
-    TransferFunctionSystem planta(b, a, frequency_plant, bufferSize);
+    // Crear sistema discreto con coeficientes discretizados y Ts_component
+    TransferFunctionSystem planta(tf_disc.b, tf_disc.a, Ts_component, bufferSize);
 
     //-------------------------------------------------------------
     // --- Crear hilo de la planta ---
@@ -95,10 +112,10 @@ int main() {
     //-------------------------------------------------------------
     //Crear ADConverter-----------------------------------------------
     //-------------------------------------------------------------
-    double Ts_converter = 1/frequency_plant;  // período de muestreo
+    double Ts_converter = Ts_component;  // período de muestreo
 
     ADConverter ADconverter(Ts_converter);
-    Hilo hiloAD(&ADconverter, &vars.yk, &vars.ykd, &vars.running, &vars.mtx, 1/Ts_converter);
+    Hilo hiloAD(&ADconverter, &vars.yk, &vars.ykd, &vars.running, &vars.mtx, freq_component);
 
     //-------------------------------------------------------------
 // Crear PID-----------------------------------------------
@@ -112,12 +129,12 @@ int main() {
     params.setpoint = 1.0;  // igual a la amplitud del escalón
     pthread_mutex_unlock(&params.mtx);
 
-    double Ts_controller = 0.01;  // periodo de muestreo 0.01 s
+   
 
     PIDController pid(params.kp, params.ki, params.kd, Ts_controller);
     
     // Usar HiloPID que lee parámetros dinámicamente
-    HiloPID hiloPID(&pid, &vars, &params, 1/Ts_controller);
+    HiloPID hiloPID(&pid, &vars, &params, freq_controller);
 
     //-------------------------------------------------------------
     //Crear DAConverter-----------------------------------------------
@@ -125,15 +142,15 @@ int main() {
     
 
     DAConverter DAconverter(Ts_converter);
-    Hilo hiloDA(&DAconverter, &vars.u, &vars.ua, &vars.running, &vars.mtx, 1/Ts_converter); 
+    Hilo hiloDA(&DAconverter, &vars.u, &vars.ua, &vars.running, &vars.mtx, freq_component); 
   
     //-------------------------------------------------------------
 // Crear Sumador-----------------------------------------------
 //-------------------------------------------------------------
     
-    double Ts_sumador = Ts_controller;
+    double Ts_sumador = Ts_component;
     Sumador sumador(Ts_sumador);
-    Hilo2in hiloSumador(&sumador, &vars.ref, &vars.ykd,  &vars.e, &vars.running, &vars.mtx, 1/Ts_sumador);
+    Hilo2in hiloSumador(&sumador, &vars.ref, &vars.ykd,  &vars.e, &vars.running, &vars.mtx, freq_component);
 
     // --- Crear transmisor para enviar datos via IPC ---
     Transmisor transmisor(&vars);

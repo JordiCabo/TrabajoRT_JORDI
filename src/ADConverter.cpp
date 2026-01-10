@@ -23,10 +23,6 @@ ADConverter::ADConverter(double Ts, size_t bufferSize)
 
 /**
  * @brief Calcula la salida del convertidor A/D mediante la ecuación y(k) = u(k-1)
- * 
- * @param uk Entrada muestreada en el paso k
- * @return Salida y(k) = u(k-1) (valor del paso anterior)
- * 
  * Implementa el retardo de un período de muestreo típico de un conversor A/D real.
  */
 double ADConverter::compute(double uk)

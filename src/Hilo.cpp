@@ -6,6 +6,7 @@
  */
 
 #include "Hilo.h"
+#include "../include/Temporizador.h"
 
 namespace DiscreteSystems {
 
@@ -58,7 +59,8 @@ void* Hilo::threadFunc(void* arg) {
  * @invariant Acceso a *input_, *output_ y *running_ solo dentro de lock_guard
  */
 void Hilo::run() {
-    int sleep_us = static_cast<int>(1e6 / frequency_); // microsegundos
+    // Temporizador con retardo absoluto para evitar drift
+    Temporizador timer(frequency_);
 
     while (true) {
         bool isRunning;
@@ -83,7 +85,7 @@ void Hilo::run() {
         pthread_mutex_unlock(mtx_);
 
 
-        usleep(sleep_us);
+        timer.esperar();
     }
 
     pthread_exit(nullptr);

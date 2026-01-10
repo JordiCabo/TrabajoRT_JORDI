@@ -7,6 +7,7 @@
 
 #include "../include/HiloPID.h"
 #include "../include/PIDController.h"
+#include "../include/Temporizador.h"
 #include <ctime>
 #include <csignal>
 
@@ -63,11 +64,8 @@ void* HiloPID::threadFunc(void* arg) {
  * @invariant Acceso a vars_ y params_ protegido por sus respectivos mutex
  */
 void HiloPID::run() {
-    // Calcular período en nanosegundos para mayor precisión
-    long period_ns = static_cast<long>((1.0 / frequency_) * 1e9);
-    struct timespec req, rem;
-    req.tv_sec = period_ns / 1000000000L;
-    req.tv_nsec = period_ns % 1000000000L;
+    // Crear temporizador con retardo absoluto (evita drift acumulativo)
+    Temporizador timer(frequency_);
 
     // Cast a PIDController para usar setGains
     PIDController* pid = dynamic_cast<PIDController*>(system_);
@@ -100,8 +98,8 @@ void HiloPID::run() {
         vars_->u = output;                    // Escribir acción de control
         pthread_mutex_unlock(&vars_->mtx);
 
-        // 5. Dormir hasta el siguiente ciclo
-        nanosleep(&req, &rem);
+        // 5. Dormir hasta el siguiente período absoluto (sin drift)
+        timer.esperar();
         iterations_++;
     }
 

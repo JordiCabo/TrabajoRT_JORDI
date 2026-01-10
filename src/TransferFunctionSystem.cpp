@@ -13,11 +13,6 @@ namespace DiscreteSystems {
 /**
  * @brief Constructor del sistema con función de transferencia
  * 
- * @param b Coeficientes del numerador [b0, b1, ..., bm]
- * @param a Coeficientes del denominador [a0, a1, ..., an]
- * @param Ts Período de muestreo en segundos
- * @param bufferSize Tamaño del buffer circular
- * 
  * Normaliza automáticamente los coeficientes del denominador para que a[0] = 1,
  * e inicializa los historiadores de entrada y salida con ceros.
  */
@@ -41,9 +36,6 @@ TransferFunctionSystem::TransferFunctionSystem(const std::vector<double>& b,
 
 /**
  * @brief Calcula la salida del sistema mediante ecuación en diferencias
- * 
- * @param uk Entrada en el paso k
- * @return Salida y(k)
  * 
  * Implementa la ecuación en diferencias:
  *   y(k) = [b[0]*u(k) + b[1]*u(k-1) + ... + b[m]*u(k-m)

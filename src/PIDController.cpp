@@ -27,9 +27,6 @@ PIDController::PIDController(double Kp, double Ki, double Kd, double Ts,
 /**
  * @brief Calcula la acción de control PID discreto mediante ecuación en diferencias
  * 
- * @param e_k Error en el paso k (e(k) = referencia - realimentación)
- * @return Acción de control u(k)
- * 
  * Implementa la ecuación en diferencias:
  *   Δu(k) = a₀·e(k) + a₁·e(k-1) + a₂·e(k-2)
  *   u(k) = u(k-1) + Δu(k)
@@ -39,9 +36,9 @@ PIDController::PIDController(double Kp, double Ki, double Kd, double Ts,
  *   a₁ = -Kp - 2·Kd/Ts
  *   a₂ = Kd/Ts
  */
-double PIDController::compute(double e_k){
+double PIDController::compute(double ek){
        
-     double e_k1 = (eHist_.size() >= 1) ? eHist_.back() : 0.0;          // e[k-1]
+    double e_k1 = (eHist_.size() >= 1) ? eHist_.back() : 0.0;          // e[k-1]
 double e_k2 = (eHist_.size() >= 2) ? eHist_[eHist_.size() - 2] : 0.0; // e[k-2]
     double u_k_minus_1 = uHist_.empty() ? 0.0 : uHist_.back();
 
@@ -49,10 +46,10 @@ double e_k2 = (eHist_.size() >= 2) ? eHist_[eHist_.size() - 2] : 0.0; // e[k-2]
     double a1 = -Kp_ - 2.0 * Kd_ / getSamplingTime();
     double a2 = Kd_ / getSamplingTime();
 
-    double delta_u = a0 * e_k + a1 * e_k1 + a2 * e_k2;
+    double delta_u = a0 * ek + a1 * e_k1 + a2 * e_k2;
     double u_k = u_k_minus_1 + delta_u;
 
-    eHist_.push_back(e_k);
+    eHist_.push_back(ek);
     uHist_.push_back(u_k);
 
     return u_k;
@@ -94,7 +91,6 @@ std::ostream& operator<<(std::ostream& os, const PIDController& pid)
 
 /**
  * @brief Actualiza la ganancia proporcional
- * @param Kp Nuevo valor de ganancia proporcional
  */
 void PIDController::setKp(double Kp) {
     Kp_ = Kp;
@@ -102,7 +98,6 @@ void PIDController::setKp(double Kp) {
 
 /**
  * @brief Actualiza la ganancia integral
- * @param Ki Nuevo valor de ganancia integral
  */
 void PIDController::setKi(double Ki) {
     Ki_ = Ki;
@@ -110,7 +105,6 @@ void PIDController::setKi(double Ki) {
 
 /**
  * @brief Actualiza la ganancia derivativa
- * @param Kd Nuevo valor de ganancia derivativa
  */
 void PIDController::setKd(double Kd) {
     Kd_ = Kd;

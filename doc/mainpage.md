@@ -216,4 +216,4 @@ Ver ejemplos detallados en cada clase. Para comenzar:
 
 ---
 
-**Más información**: Consulta el [README.md](README.md) del proyecto.
+**Más información**: Consulta el README del proyecto (archivo README.md en la raíz).

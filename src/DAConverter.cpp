@@ -23,10 +23,6 @@ DAConverter::DAConverter(double Ts, size_t bufferSize)
 
 /**
  * @brief Calcula la salida del convertidor D/A mediante retenedor de orden cero (ZOH)
- * 
- * @param uk Entrada digital en el paso k
- * @return Salida y(k) = u(k) (misma entrada)
- * 
  * Implementa un retenedor ZOH ideal: la salida es igual a la entrada y se
  * mantiene constante durante el período de muestreo.
  */

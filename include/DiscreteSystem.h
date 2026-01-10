@@ -85,12 +85,8 @@ public:
      */
     void reset();
 
-    /**
-     * @brief Exporta el buffer de muestras a un stream
-     * @param os Stream de salida
-     * @param format Formato de exportación (TSV o MATLAB)
-     */
-    //void bufferDump(std::ostream& os, ExportFormat format = ExportFormat::TSV) const;
+    // Export del buffer (deshabilitado). Si se reactiva, documentar aquí sin @param para evitar warnings Doxygen.
+    // void bufferDump(std::ostream& os, ExportFormat format = ExportFormat::TSV) const;
 
     /**
      * @brief Obtiene el período de muestreo
