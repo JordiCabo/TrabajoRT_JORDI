@@ -5,32 +5,6 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
-## [1.0.3] - 2026-01-10
-
-### Cambiado
-- **HiloSignal**, **HiloSwitch**, **HiloTransmisor**, **HiloReceptor**, **HiloIntArranque**: Sustitución de `usleep` por `Temporizador` con temporización absoluta (`clock_nanosleep` + `TIMER_ABSTIME`) y comentarios actualizados.
-- **Documentación**: README, ARCHITECTURE y mainpage actualizadas para reflejar temporización absoluta y utilidades de discretización.
-
-### Corregido
-- Calificación de namespace `DiscreteSystems::Temporizador` en hilos auxiliares para compilación correcta.
-
-## [1.0.2] - 2026-01-10
-
-### Añadido
-- **Discretizer**: Nueva utilidad para discretizar funciones de transferencia continuas B(s)/A(s) a B(z)/A(z) mediante transformación bilineal (Tustin).
-- **Temporizador**: Nueva clase para temporización absoluta con `clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME)` eliminando drift acumulativo en loops periódicos.
-
-### Cambiado
-- **Hilo**, **Hilo2in**, **HiloPID**: Reemplazado `usleep()` y `nanosleep()` relativo por `Temporizador` con retardo absoluto para mayor precisión en tiempo real.
-- **testHilo.cpp**: Actualizado para discretizar planta continua 1/(tau*s+1) usando `Discretizer::discretizeTF()` con método Tustin.
-- **Sección de Frecuencias**: Centralización en testHilo.cpp con `Ts_controller=0.01s` y `Ts_component=Ts_controller/10`.
-- **Documentación**: README, ARCHITECTURE y mainpage Doxygen actualizados con descripciones de Discretizer y Temporizador.
-- **Doxyfile**: Eliminado `Interfaz_Control/src/` de INPUT (proyecto ajeno al core).
-
-### Corregido
-- Comentarios Doxygen: Eliminados `@param` duplicados y referencias rotas en ADConverter, DAConverter, PIDController, Sumador, StateSpaceSystem, TransferFunctionSystem.
-- DiscreteSystem.h: Eliminado bloque comentado `bufferDump()` que generaba warnings Doxygen.
-
 ## [Unreleased]
 
 ### Añadido
@@ -100,6 +74,23 @@ pthread_mutex_unlock(mtx_.get());
 
 ### Corregido
 - Calificación de namespace `DiscreteSystems::Temporizador` en hilos auxiliares para compilación correcta.
+
+## [1.0.2] - 2026-01-10
+
+### Añadido
+- **Discretizer**: Nueva utilidad para discretizar funciones de transferencia continuas B(s)/A(s) a B(z)/A(z) mediante transformación bilineal (Tustin).
+- **Temporizador**: Nueva clase para temporización absoluta con `clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME)` eliminando drift acumulativo en loops periódicos.
+
+### Cambiado
+- **Hilo**, **Hilo2in**, **HiloPID**: Reemplazado `usleep()` y `nanosleep()` relativo por `Temporizador` con retardo absoluto para mayor precisión en tiempo real.
+- **testHilo.cpp**: Actualizado para discretizar planta continua 1/(tau*s+1) usando `Discretizer::discretizeTF()` con método Tustin.
+- **Sección de Frecuencias**: Centralización en testHilo.cpp con `Ts_controller=0.01s` y `Ts_component=Ts_controller/10`.
+- **Documentación**: README, ARCHITECTURE y mainpage Doxygen actualizados con descripciones de Discretizer y Temporizador.
+- **Doxyfile**: Eliminado `Interfaz_Control/src/` de INPUT (proyecto ajeno al core).
+
+### Corregido
+- Comentarios Doxygen: Eliminados `@param` duplicados y referencias rotas en ADConverter, DAConverter, PIDController, Sumador, StateSpaceSystem, TransferFunctionSystem.
+- DiscreteSystem.h: Eliminado bloque comentado `bufferDump()` que generaba warnings Doxygen.
 
 ## [1.1.0] - 2026-01-03
 
@@ -190,7 +181,8 @@ pthread_mutex_unlock(mtx_.get());
 
 [Unreleased]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.0.4...HEAD
 [1.0.4]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.0.3...v1.0.4
-[1.0.3]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.1.0...v1.0.3
+[1.0.3]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.1.0...v1.0.2
 [1.1.0]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/JordiCabo/TrabajoRT_JORDI/releases/tag/v0.1.0
