@@ -4,11 +4,11 @@
  * @author Jordi
  * @author GitHub Copilot (asistencia)
  * 
- * @brief Implementación de HiloReceptor
+ * @brief Implementación de HiloReceptor con temporización absoluta
  */
 
 #include "HiloReceptor.h"
-#include <unistd.h>
+#include "../include/Temporizador.h"
 #include <iostream>
 #include <csignal>
 
@@ -44,9 +44,10 @@ void* HiloReceptor::threadFunc(void* arg) {
  * 
  * Ejecuta receptor->recibir() periódicamente mientras *running_ sea true.
  * Lee running bajo protección mutex para evitar condiciones de carrera.
+ * Usa Temporizador con temporización absoluta para eliminar drift.
  */
 void HiloReceptor::run() {
-    int sleep_us = static_cast<int>(1e6 / frequency_); // microsegundos
+    DiscreteSystems::Temporizador timer(frequency_);
 
     while (true) {
         bool isRunning;
@@ -60,8 +61,8 @@ void HiloReceptor::run() {
         // Recibir datos (receptor ya maneja el mutex internamente)
         receptor_->recibir(); // No reportar error si no hay mensaje
 
-        // Esperar hasta completar el período
-        usleep(sleep_us);
+        // Esperar hasta completar el período (temporización absoluta)
+        timer.esperar();
     }
 
     pthread_exit(nullptr);

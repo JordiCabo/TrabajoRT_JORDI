@@ -10,7 +10,7 @@
 
 ## Descripción General
 
-Framework de control de sistemas en tiempo real implementado en C++17. Incluye librería core (PID, TF, SS, generadores de señal) y componentes IPC para sintonización en línea y visualización en GUI.
+Framework de control de sistemas en tiempo real implementado en C++17. Incluye librería core (PID, TF, SS, generadores de señal), utilidades de discretización (Discretizer con Tustin), temporización absoluta (Temporizador) y componentes IPC para sintonización en línea y visualización en GUI.
 
 ## Arquitectura de Lazo de Control Cerrado
 
@@ -165,10 +165,15 @@ HiloTransmisor hilo_tx(&transmisor, &running, &mtx, 50);                   // En
 - **ADConverter**: Muestreador A/D con retardo
 - **DAConverter**: Retenedor de orden cero (ZOH)
 - **Sumador**: Bloque restador para cálculo de error
-- **Hilo/Hilo2in**: Wrappers pthread para ejecución en tiempo real
-- **HiloPID**: Wrapper especializado de PID con lectura dinámica de Kp/Ki/Kd
-- **HiloReceptor/HiloTransmisor**: Hilos periódicos para IPC (params/data)
-- **HiloSwitch**: Hilo para multiplexado dinámico de referencia
+- **Hilo/Hilo2in**: Wrappers pthread para ejecución en tiempo real (con `Temporizador`)
+- **HiloPID**: Wrapper especializado de PID con lectura dinámica de Kp/Ki/Kd (con `Temporizador`)
+- **HiloReceptor/HiloTransmisor**: Hilos periódicos para IPC (params/data) (con `Temporizador`)
+- **HiloSwitch**: Hilo para multiplexado dinámico de referencia (con `Temporizador`)
+
+### Utilidades de Discretización y Temporización
+
+- **Discretizer**: Discretiza funciones de transferencia continuas B(s)/A(s) → B(z)/A(z) usando **método Tustin (bilineal)**. Permite convertir plantas analógicas a representación discreta con período de muestreo configurable.
+- **Temporizador**: Proporciona temporización periódica **absoluta** mediante `clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME)`, eliminando drift acumulativo en loops de control. Usado por todos los hilos (`Hilo`, `HiloPID`, `HiloReceptor`, `HiloTransmisor`, `HiloSwitch`).
 
 ### Namespace SignalGenerator
 

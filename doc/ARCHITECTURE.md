@@ -152,7 +152,7 @@ Este patrón se aplica análogamente en `Hilo` (1 entrada → 1 salida) y `HiloS
 
 - **Regiones críticas cortas**: leer/escribir bajo mutex y computar fuera.
 - **Sin deadlocks**: un único mutex compartido, sin bloqueos anidados.
-- **Jitter controlado**: el período se mantiene con `usleep`, el tiempo bajo lock es mínimo.
+- **Jitter controlado**: el período se mantiene con `Temporizador` (`clock_nanosleep` con `TIMER_ABSTIME`), el tiempo bajo lock es mínimo.
 - **Terminación ordenada**: cada hilo verifica `running` bajo mutex y finaliza limpiamente.
 
 ### Observaciones Operativas
@@ -591,15 +591,15 @@ std::mutex mtx_;
 
 ```cpp
 void Hilo::run() {
-    int sleep_us = static_cast<int>(1e6 / frequency_);
+    Temporizador timer(frequency_);
     while (*running_) {
         // Trabajo...
-        usleep(sleep_us);  // Espera período
+        timer.esperar();  // clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME)
     }
 }
 ```
 
-**Nota**: No es hard real-time. Para aplicaciones críticas, usar scheduler RT de Linux.
+**Nota**: Usa temporización absoluta para evitar drift. Para aplicaciones hard real-time críticas, considerar scheduler RT de Linux.
 
 ## 🧪 Testabilidad
 

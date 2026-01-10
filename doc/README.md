@@ -281,7 +281,7 @@ Evita asignaciones dinámicas en el hot loop. Implementado con `std::deque` e í
 Structs sin padding para portabilidad entre procesos. Uso de `serializeDataMessage()`.
 
 ### Threading de Frecuencia Fija
-`Hilo` usa `usleep()` para mantener período constante de ejecución.
+`Hilo`, `Hilo2in`, `HiloPID` usan `Temporizador` con `clock_nanosleep(TIMER_ABSTIME)` para mantener período constante sin drift acumulativo.
 
 ## 👥 Autoría
 

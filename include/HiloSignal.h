@@ -1,11 +1,12 @@
 /**
  * @file HiloSignal.h
- * @brief Wrapper de threading para ejecutar generadores de señal en tiempo real
+ * @brief Wrapper de threading para ejecutar generadores de señal en tiempo real con temporización absoluta
  * @author Jordi + GitHub Copilot
  * @date 2025-12-18
  * 
  * Proporciona ejecución pthread de un generador de señal a una frecuencia fija,
- * con protección de variables compartidas mediante mutex.
+ * con protección de variables compartidas mediante mutex y Temporizador
+ * para evitar drift acumulativo.
  */
 
 #pragma once

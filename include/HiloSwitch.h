@@ -1,12 +1,13 @@
 /**
  * @file HiloSwitch.h
- * @brief Threading para multiplexado dinámico de señales de referencia
+ * @brief Threading para multiplexado dinámico de señales de referencia con temporización absoluta
  * @author Jordi + GitHub Copilot
  * @date 2026-01-03
  * 
  * Implementa un hilo POSIX que ejecuta un SignalSwitch para permitir
  * cambio dinámico de la señal de referencia (escalón, rampa, senoidal, PWM)
- * sin interrumpir la ejecución del lazo de control.
+ * sin interrumpir la ejecución del lazo de control. Usa Temporizador
+ * para evitar drift acumulativo.
  */
 
 #ifndef HILO_SWITCH_H

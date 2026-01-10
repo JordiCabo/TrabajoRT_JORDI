@@ -1,12 +1,13 @@
 /**
  * @file HiloTransmisor.h
- * @brief Threading para envío periódico de datos de control via IPC
+ * @brief Threading para envío periódico de datos de control via IPC con temporización absoluta
  * @author Jordi + GitHub Copilot
  * @date 2026-01-03
  * 
  * Implementa un hilo POSIX que ejecuta el envío de datos de control
- * hacia la mqueue a una frecuencia configurable, permitiendo visualización
- * en tiempo real sin bloquear el lazo de control.
+ * hacia la mqueue a una frecuencia configurable usando Temporizador
+ * para evitar drift, permitiendo visualización en tiempo real sin bloquear
+ * el lazo de control.
  */
 
 #ifndef HILO_TRANSMISOR_H

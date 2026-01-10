@@ -4,11 +4,11 @@
  * @author Jordi
  * @author GitHub Copilot (asistencia)
  * 
- * @brief Implementación de HiloSwitch
+ * @brief Implementación de HiloSwitch con temporización absoluta
  */
 
 #include "HiloSwitch.h"
-#include <unistd.h>
+#include "../include/Temporizador.h"
 #include <iostream>
 #include <csignal>
 
@@ -46,9 +46,10 @@ void* HiloSwitch::threadFunc(void* arg) {
  * 
  * Lee signal_type de params_ y actualiza el selector antes de ejecutar next().
  * El switch internamente delega al next() de la señal seleccionada.
+ * Usa Temporizador con temporización absoluta para eliminar drift.
  */
 void HiloSwitch::run() {
-    int sleep_us = static_cast<int>(1e6 / frequency_); // microsegundos
+    DiscreteSystems::Temporizador timer(frequency_);
 
     while (true) {
         bool isRunning;
@@ -91,8 +92,8 @@ void HiloSwitch::run() {
         *output_ = value;
         pthread_mutex_unlock(mtx_);
 
-        // Esperar hasta completar el período
-        usleep(sleep_us);
+        // Esperar hasta completar el período (temporización absoluta)
+        timer.esperar();
     }
 
     pthread_exit(nullptr);

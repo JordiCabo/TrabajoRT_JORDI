@@ -1,11 +1,12 @@
 /**
  * @file HiloSignal.cpp
- * @brief Implementación del wrapper de threading para generadores de señal
+ * @brief Implementación del wrapper de threading para generadores de señal con temporización absoluta
  * @author Jordi + GitHub Copilot
  * @date 2025-12-18
  */
 
 #include "HiloSignal.h"
+#include "../include/Temporizador.h"
 #include <csignal>
 
 namespace SignalGenerator {
@@ -55,13 +56,14 @@ void* HiloSignal::threadFunc(void* arg) {
  * Ejecuta el generador de señal en bucle a la frecuencia especificada
  * mientras *running_ sea true. Genera muestras y las almacena sincronizadas
  * en la variable de salida compartida mediante el mutex.
+ * Usa Temporizador con temporización absoluta para eliminar drift.
  * 
  * @invariant Período de ejecución = 1/frequency_ segundos
  * @invariant Acceso a *output_ y *running_ solo dentro de lock_guard
  */
 void HiloSignal::run() {
 
-    int sleep_us = static_cast<int>(1e6 / frequency_); // periodo real del hilo
+    DiscreteSystems::Temporizador timer(frequency_);
 
     while (true) {
         bool isRunning;
@@ -80,7 +82,7 @@ void HiloSignal::run() {
         *output_ = y;
         pthread_mutex_unlock(mtx_);
 
-        usleep(sleep_us);
+        timer.esperar();
     }
 
     pthread_exit(nullptr);

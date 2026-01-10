@@ -1,12 +1,12 @@
 /**
  * @file HiloReceptor.h
- * @brief Threading para recepción periódica de parámetros via IPC
+ * @brief Threading para recepción periódica de parámetros via IPC con temporización absoluta
  * @author Jordi + GitHub Copilot
  * @date 2026-01-03
  * 
  * Implementa un hilo POSIX que ejecuta la recepción de parámetros
- * desde la mqueue a una frecuencia configurable, desacoplando el
- * proceso IPC de la ejecución del lazo de control.
+ * desde la mqueue a una frecuencia configurable usando Temporizador,
+ * desacoplando el proceso IPC de la ejecución del lazo de control.
  */
 
 #ifndef HILO_RECEPTOR_H

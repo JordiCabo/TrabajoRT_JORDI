@@ -1,5 +1,5 @@
 #include "HiloIntArranque.h"
-#include <unistd.h>
+#include "../include/Temporizador.h"
 #include <csignal>
 
 volatile sig_atomic_t g_signal_run = 1;
@@ -33,6 +33,8 @@ void* HiloIntArranque::threadFunc(void* arg) {
 }
 
 void HiloIntArranque::run() {
+    DiscreteSystems::Temporizador timer(10.0);  // Chequear cada 100ms (10 Hz)
+    
     while (true) {
         if (!g_signal_run) {
             pthread_mutex_lock(mtx_);
@@ -49,6 +51,6 @@ void HiloIntArranque::run() {
             break;
         }
         
-        usleep(100000);  // 100 ms entre comprobaciones
+        timer.esperar();  // Temporización absoluta
     }
 }

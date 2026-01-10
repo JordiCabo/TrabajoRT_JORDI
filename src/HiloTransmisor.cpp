@@ -4,11 +4,11 @@
  * @author Jordi
  * @author GitHub Copilot (asistencia)
  * 
- * @brief Implementación de HiloTransmisor
+ * @brief Implementación de HiloTransmisor con temporización absoluta
  */
 
 #include "HiloTransmisor.h"
-#include <unistd.h>
+#include "../include/Temporizador.h"
 #include <iostream>
 #include <csignal>
 
@@ -44,9 +44,10 @@ void* HiloTransmisor::threadFunc(void* arg) {
  * 
  * Ejecuta transmisor->enviar() periódicamente mientras *running_ sea true.
  * Lee running bajo protección mutex para evitar condiciones de carrera.
+ * Usa Temporizador con temporización absoluta para eliminar drift.
  */
 void HiloTransmisor::run() {
-    int sleep_us = static_cast<int>(1e6 / frequency_); // microsegundos
+    DiscreteSystems::Temporizador timer(frequency_);
 
     while (true) {
         bool isRunning;
@@ -62,8 +63,8 @@ void HiloTransmisor::run() {
             std::cerr << "HiloTransmisor: Error al enviar datos" << std::endl;
         }
 
-        // Esperar hasta completar el período
-        usleep(sleep_us);
+        // Esperar hasta completar el período (temporización absoluta)
+        timer.esperar();
     }
 
     pthread_exit(nullptr);
