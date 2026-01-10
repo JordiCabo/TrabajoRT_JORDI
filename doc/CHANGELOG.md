@@ -7,18 +7,23 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
-### Añadido
-- (Pendiente)
+### Añadido (v1.0.5 - Próximamente)
+- Logging básico con timestamp y nombre de hilo
+- Configuración centralizada de frecuencias (Config/comm_config.h)
+- CI/CD con GitHub Actions (build, tests, clang-tidy, sanitizers)
 
-### Cambiado
-- (Pendiente)
+### Cambiado (v1.0.5 - Próximamente)
+- Reemplazar VariablesCompartidas.mtx (pthread_mutex_t) por `std::mutex` wrapper
+- Evaluar `std::atomic<bool>` para flag de ejecución (running)
+- Separación de mutex por variable/estructura (SharedVars pattern)
 
-### Corregido
-- (Pendiente)
+### Corregido (v1.0.5 - Próximamente)
+- Verificar retornos de `pthread_create`/`pthread_join` en todos los hilos
+- Errores no controlados en inicialización de Receptor/Transmisor
 
 ## [1.0.4] - 2026-01-10
 
-### Cambiado - Refactorización a Smart Pointers
+### Cambiado - Refactorización a Smart Pointers (COMPLETADA ✅)
 **Objetivo**: Garantizar ciclo de vida seguro de objetos compartidos entre múltiples hilos, resolviendo riesgos de punteros crudos.
 
 #### Fase 1: Core Threading (Completada) ✅
@@ -55,10 +60,12 @@ Refactorización de código cliente completada:
 - **Validación runtime**: testHilo ejecutado exitosamente, hilos funcionando correctamente
 
 ### Beneficios Logrados
-✅ **Eliminación de memory leaks**: Reference counting automático  
-✅ **Acceso seguro**: Imposible acceder a objeto destruido mientras hilo activo  
-✅ **Propiedad clara**: Cada hilo co-posee sus recursos explícitamente  
-✅ **Thread-safety mejorada**: Atomic operations en ref-counting internamente  
+✅ **Eliminación de memory leaks**: Reference counting automático en todas las clases Hilo*  
+✅ **Acceso seguro**: Imposible acceder a objeto destruido mientras hilo está activo  
+✅ **Propiedad clara**: Cada hilo co-posee sus recursos explícitamente (co-ownership)  
+✅ **Thread-safety mejorada**: Atomic operations en ref-counting manejadas internamente por shared_ptr  
+✅ **Compilación 100%**: Proyecto completo compila sin errores  
+✅ **Runtime validado**: testHilo ejecutado exitosamente con hilos funcionando correctamente
 
 ### Patrón Implementado
 ```cpp
@@ -70,8 +77,10 @@ pthread_mutex_unlock(mtx_.get());
 
 ### Notas Técnicas
 - Minimal performance overhead (1-2 ciclos CPU por ref-count)
-- Hot-loop (Hilo::run) ya optimizado sin asignaciones dinámicas
-- Futuro: Refactorizar `VariablesCompartidas` con `std::mutex` wrapper
+- Hot-loop (Hilo::run) optimizado sin asignaciones dinámicas
+- Doxygen documentación completa en todos los headers con v1.0.4+ marca
+- Futuro: Refactorizar `VariablesCompartidas` con `std::mutex` wrapper en v1.0.5
+- Futuro: Investigar `std::atomic<bool>` para flag de ejecución (running)
 
 ## [1.0.3] - 2026-01-10
 
