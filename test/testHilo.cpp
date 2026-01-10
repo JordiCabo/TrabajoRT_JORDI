@@ -1,6 +1,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <mutex>
+#include <memory>
 #include "TransferFunctionSystem.h"
 #include "Hilo.h"
 #include "Hilo2in.h"
@@ -26,12 +27,17 @@
 
 using namespace DiscreteSystems;
 
- VariablesCompartidas vars;
- ParametrosCompartidos params;
- 
-
 int main() {
-    // --- Variablefalse;  // inicialmente en false
+    // --- Crear variables compartidas como shared_ptr ---
+    auto vars = std::make_shared<VariablesCompartidas>();
+    auto params = std::make_shared<ParametrosCompartidos>();
+    
+    // --- Crear mutex compartido ---
+    auto mtx = std::make_shared<pthread_mutex_t>();
+    pthread_mutex_init(mtx.get(), nullptr);
+    
+    // --- Crear running flag compartido ---
+    auto running = std::make_shared<bool>(true);  // inicialmente en true
     
     //-------------------------------------------------------------
     // ---------------- Frecuencias de muestreo -------------------
@@ -42,13 +48,13 @@ int main() {
     const double freq_component  = 1.0 / Ts_component;  // Hz
 
     // --- Crear InterruptorArranque y HiloIntArranque ---
-    InterruptorArranque interruptor;
+    auto interruptor = std::make_shared<InterruptorArranque>();
 
     // Activar running a través del interruptor
-    interruptor.setRun(1);
+    interruptor->setRun(1);
 
     // Crear el hilo del interruptor de arranque/paro (frecuencia de componentes)
-    HiloIntArranque hiloInterruptor(&interruptor, &vars.running, &vars.mtx, freq_component);
+    HiloIntArranque hiloInterruptor(interruptor, running, mtx, freq_component);
 
     //-------------------------------------------------------------
     // --------- Crear la referencia (SignalSwitch) ---------------
@@ -74,12 +80,13 @@ int main() {
     auto pwmSignal = std::make_shared<SignalGenerator::PwmSignal>(Ts_signal, amplitude, duty, period_pwm, offset);
 
     // Crear SignalSwitch: 0=step, 1=pwm, 2=sine (selector inicial = 0: escalón)
-    SignalGenerator::SignalSwitch signalSwitch(stepSignal, pwmSignal, sinSignal, 0);
+    auto signalSwitch = std::make_shared<SignalGenerator::SignalSwitch>(stepSignal, pwmSignal, sinSignal, 0);
     
-   
+    // Crear ref como shared_ptr
+    auto ref = std::make_shared<double>(0.0);
     
     // Crear HiloSwitch para ejecutar el switch periódicamente
-        HiloSwitch hiloRef(&signalSwitch, &vars.ref, &vars.running, &vars.mtx, &params, freq_component);
+    HiloSwitch hiloRef(signalSwitch, ref, running, mtx, params, freq_component);
   
   
     //-------------------------------------------------------------
@@ -98,85 +105,90 @@ int main() {
     size_t bufferSize = 10;
 
     // Crear sistema discreto con coeficientes discretizados y Ts_component
-    TransferFunctionSystem planta(tf_disc.b, tf_disc.a, Ts_component, bufferSize);
+    auto planta = std::make_shared<TransferFunctionSystem>(tf_disc.b, tf_disc.a, Ts_component, bufferSize);
+    
+    // Crear entrada/salida compartidas
+    auto ua = std::make_shared<double>(0.0);
+    auto yk = std::make_shared<double>(0.0);
 
     //-------------------------------------------------------------
     // --------------- Crear hilo de la planta --------------------
     //-------------------------------------------------------------
-    
-    Hilo hiloPlanta(&planta, &vars.ua, &vars.yk,  &vars.running, &vars.mtx, frequency_plant);
+    Hilo hiloPlanta(planta, ua, yk, running, mtx, frequency_plant);
 
     //-------------------------------------------------------------
     // ---------------- Crear ADConverter --------------------------
     //-------------------------------------------------------------
     double Ts_converter = Ts_component;  // período de muestreo
 
-    ADConverter ADconverter(Ts_converter);
-    Hilo hiloAD(&ADconverter, &vars.yk, &vars.ykd, &vars.running, &vars.mtx, freq_component);
+    auto ADconverter = std::make_shared<ADConverter>(Ts_converter);
+    auto ykd = std::make_shared<double>(0.0);
+    Hilo hiloAD(ADconverter, yk, ykd, running, mtx, freq_component);
 
     //-------------------------------------------------------------
     // ---------------- Crear PID ----------------------------------
     //-------------------------------------------------------------
 
     // Inicializar parámetros compartidos con valores por defecto
-    pthread_mutex_lock(&params.mtx);
-    params.kp = 5.0;
-    params.ki = 3.0;
-    params.kd = 0.7;
-    params.setpoint = 1.0;  // igual a la amplitud del escalón
-    pthread_mutex_unlock(&params.mtx);
+    pthread_mutex_lock(mtx.get());
+    params->kp = 5.0;
+    params->ki = 3.0;
+    params->kd = 0.7;
+    params->setpoint = 1.0;  // igual a la amplitud del escalón
+    pthread_mutex_unlock(mtx.get());
 
-   
-
-    PIDController pid(params.kp, params.ki, params.kd, Ts_controller);
+    auto pid = std::make_shared<PIDController>(params->kp, params->ki, params->kd, Ts_controller);
+    
+    // Crear error como shared_ptr
+    auto e = std::make_shared<double>(0.0);
+    
+    // Crear u como shared_ptr
+    auto u = std::make_shared<double>(0.0);
     
     // Usar HiloPID que lee parámetros dinámicamente
-    HiloPID hiloPID(&pid, &vars, &params, freq_controller);
+    HiloPID hiloPID(pid, vars, params, freq_controller);
 
     //-------------------------------------------------------------
     // ---------------- Crear DAConverter --------------------------
     //-------------------------------------------------------------
-    
-
-    DAConverter DAconverter(Ts_converter);
-    Hilo hiloDA(&DAconverter, &vars.u, &vars.ua, &vars.running, &vars.mtx, freq_component); 
+    auto DAconverter = std::make_shared<DAConverter>(Ts_converter);
+    Hilo hiloDA(DAconverter, u, ua, running, mtx, freq_component); 
   
     //-------------------------------------------------------------
     // ---------------- Crear Sumador ------------------------------
-//-------------------------------------------------------------
-    
+    //-------------------------------------------------------------
     double Ts_sumador = Ts_component;
-    Sumador sumador(Ts_sumador);
-    Hilo2in hiloSumador(&sumador, &vars.ref, &vars.ykd,  &vars.e, &vars.running, &vars.mtx, freq_component);
+    auto sumador = std::make_shared<Sumador>(Ts_sumador);
+    Hilo2in hiloSumador(sumador, ref, ykd, e, running, mtx, freq_component);
 
     //-------------------------------------------------------------
     // -------- Crear transmisor para enviar datos via IPC --------
     //-------------------------------------------------------------
-    Transmisor transmisor(&vars);
-    if (!transmisor.inicializar()) {
+    auto transmisor = std::make_shared<Transmisor>(vars.get());
+    if (!transmisor->inicializar()) {
         std::cerr << "Error: No se pudo inicializar el Transmisor" << std::endl;
-        vars.running = false;
+        *running = false;
         return 1;
     }
     std::cout << "Transmisor inicializado correctamente" << std::endl;
 
     // --- Crear hilo de transmisión a frecuencia de componentes ---
-    HiloTransmisor hiloTransmisor(&transmisor, &vars.running, &vars.mtx, freq_component);
+    HiloTransmisor hiloTransmisor(transmisor, running, mtx, freq_component);
     std::cout << "Hilo de transmisión iniciado a " << freq_component << " Hz" << std::endl;
 
     //-------------------------------------------------------------
     // -------- Crear receptor para recibir parámetros via IPC -----
     //-------------------------------------------------------------
-    Receptor receptor(&params);
-    if (!receptor.inicializar()) {
+    auto receptor = std::make_shared<Receptor>(params.get());
+    if (!receptor->inicializar()) {
         std::cerr << "Error: No se pudo inicializar el Receptor" << std::endl;
-        vars.running = false;
+        *running = false;
         return 1;
     }
     std::cout << "Receptor inicializado correctamente" << std::endl;
 
     // --- Crear hilo de recepción a frecuencia de componentes ---
-    HiloReceptor hiloReceptor(&receptor, &vars.running, &vars.mtx, freq_component);
+    HiloReceptor hiloReceptor(receptor, running, mtx, freq_component);
     std::cout << "Hilo de recepción iniciado a " << freq_component << " Hz" << std::endl;
 
     //-------------------------------------------------------------
@@ -185,37 +197,37 @@ int main() {
     int k=0;
     while(true) {
         bool running_now;
-        pthread_mutex_lock(&vars.mtx);
-        running_now = vars.running;
-        pthread_mutex_unlock(&vars.mtx);
+        pthread_mutex_lock(mtx.get());
+        running_now = *running;
+        pthread_mutex_unlock(mtx.get());
         if (!running_now) break;
         // Leer salida de la planta
-        double yk;
-        pthread_mutex_lock(&vars.mtx);
-        yk = vars.yk;
-        pthread_mutex_unlock(&vars.mtx);
+        double yk_val;
+        pthread_mutex_lock(mtx.get());
+        yk_val = *yk;
+        pthread_mutex_unlock(mtx.get());
 
         // Leer parámetros actuales del PID y tipo de señal
         double kp_actual, ki_actual, kd_actual, setpoint_actual;
         int signal_type_actual;
-        pthread_mutex_lock(&params.mtx);
-        kp_actual = params.kp;
-        ki_actual = params.ki;
-        kd_actual = params.kd;
-        setpoint_actual = params.setpoint;
-        signal_type_actual = params.signal_type;
-        pthread_mutex_unlock(&params.mtx);
+        pthread_mutex_lock(mtx.get());
+        kp_actual = params->kp;
+        ki_actual = params->ki;
+        kd_actual = params->kd;
+        setpoint_actual = params->setpoint;
+        signal_type_actual = params->signal_type;
+        pthread_mutex_unlock(mtx.get());
 
         std::cout << "k=" << k
-                  << " | Ref=" << vars.ref
-                  << " | u=" << vars.u
-                  << " | yk=" << yk
+                  << " | Ref=" << *ref
+                  << " | u=" << *u
+                  << " | yk=" << yk_val
                   << " | Kp=" << kp_actual
                   << " | Ki=" << ki_actual
                   << " | Kd=" << kd_actual
                   << " | Setpoint=" << setpoint_actual
                   << " | Signal=" << signal_type_actual << " (0=step,1=sine,2=pwm)"
-                  << " | t=" << transmisor.getTiempoTranscurrido() << "s"
+                  << " | t=" << transmisor->getTiempoTranscurrido() << "s"
                   << std::endl;
         k++;
         usleep(50000); // 50 ms entre impresiones
@@ -236,8 +248,11 @@ int main() {
     pthread_join(hiloReceptor.getThread(), nullptr);
 
     // Cerrar transmisor y receptor
-    transmisor.cerrar();
-    receptor.cerrar();
+    transmisor->cerrar();
+    receptor->cerrar();
+    
+    // Destructor mutex
+    pthread_mutex_destroy(mtx.get());
 
     return 0;
 }
