@@ -10,6 +10,7 @@
 #include "HiloTransmisor.h"
 #include "../include/Temporizador.h"
 #include <iostream>
+#include <stdexcept>
 #include <csignal>
 
 /**
@@ -21,7 +22,11 @@ HiloTransmisor::HiloTransmisor(std::shared_ptr<Transmisor> transmisor,
                                double frequency)
     : transmisor_(transmisor), running_(running), mtx_(mtx), frequency_(frequency)
 {
-    pthread_create(&thread_, nullptr, &HiloTransmisor::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloTransmisor::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "ERROR HiloTransmisor: pthread_create failed with code " << ret << std::endl;
+        throw std::runtime_error("HiloTransmisor: Failed to create thread");
+    }
 }
 
 /**
@@ -29,7 +34,10 @@ HiloTransmisor::HiloTransmisor(std::shared_ptr<Transmisor> transmisor,
  */
 HiloTransmisor::~HiloTransmisor() {
     void* retVal;
-    pthread_join(thread_, &retVal);
+    int ret = pthread_join(thread_, &retVal);
+    if (ret != 0) {
+        std::cerr << "WARNING HiloTransmisor: pthread_join failed with code " << ret << std::endl;
+    }
 }
 
 /**

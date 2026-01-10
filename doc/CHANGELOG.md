@@ -7,19 +7,52 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
-### Añadido (v1.0.5 - Próximamente)
+### Añadido (v1.0.5 Fase 2+ - Próximamente)
 - Logging básico con timestamp y nombre de hilo
 - Configuración centralizada de frecuencias (Config/comm_config.h)
 - CI/CD con GitHub Actions (build, tests, clang-tidy, sanitizers)
 
-### Cambiado (v1.0.5 - Próximamente)
+### Cambiado (v1.0.5 Fase 2+ - Próximamente)
 - Reemplazar VariablesCompartidas.mtx (pthread_mutex_t) por `std::mutex` wrapper
 - Evaluar `std::atomic<bool>` para flag de ejecución (running)
 - Separación de mutex por variable/estructura (SharedVars pattern)
 
-### Corregido (v1.0.5 - Próximamente)
-- Verificar retornos de `pthread_create`/`pthread_join` en todos los hilos
+### Corregido (v1.0.5 Fase 2+ - Próximamente)
 - Errores no controlados en inicialización de Receptor/Transmisor
+
+## [1.0.5-Fase-1] - 2026-01-10
+
+### Corregido - Control de Errores en Threading (COMPLETADA ✅)
+**Objetivo**: Implementar verificación de retornos en `pthread_create` y `pthread_join` para mejorar robustez y facilitar debugging.
+
+#### Implementación Completada ✅
+Verificación de errores agregada a todas las 8 clases Hilo*:
+- **Constructores (pthread_create)**:
+  - Captura de `int ret = pthread_create(...)`
+  - Verificación condicional: `if (ret != 0) { std::cerr << ...; throw std::runtime_error(...); }`
+  - Excepciones lanzadas permiten manejo a nivel de aplicación
+  - Formato de error: `"ERROR [ClassName]: pthread_create failed with code [ret]"`
+
+- **Destructores (pthread_join)**:
+  - Captura de `int ret = pthread_join(...)`
+  - Verificación condicional con advertencia: `if (ret != 0) { std::cerr << "WARNING ..."; }`
+  - No se lanzan excepciones en destructores (mejor práctica C++)
+  - Formato de advertencia: `"WARNING [ClassName]: pthread_join failed with code [ret]"`
+
+#### Clases Afectadas ✅
+1. **Hilo.h/cpp** - Base class
+2. **Hilo2in.h/cpp** - Dos entradas (Sumador)
+3. **HiloPID.h/cpp** - PID especializado
+4. **HiloSignal.h/cpp** - Generador de señal
+5. **HiloSwitch.h/cpp** - Selector de señal
+6. **HiloIntArranque.h/cpp** - Interruptor de arranque
+7. **HiloTransmisor.h/cpp** - Transmisor IPC
+8. **HiloReceptor.h/cpp** - Receptor IPC
+
+#### Headers Agregados ✅
+- `#include <iostream>` - Para std::cerr
+- `#include <stdexcept>` - Para std::runtime_error
+Verificación: Todos los archivos compilados exitosamente (0 errores)
 
 ## [1.0.4] - 2026-01-10
 

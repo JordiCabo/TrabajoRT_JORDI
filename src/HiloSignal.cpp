@@ -7,6 +7,8 @@
 
 #include "HiloSignal.h"
 #include "../include/Temporizador.h"
+#include <iostream>
+#include <stdexcept>
 #include <csignal>
 
 namespace SignalGenerator {
@@ -24,7 +26,11 @@ HiloSignal::HiloSignal(std::shared_ptr<Signal> signal, std::shared_ptr<double> o
     : signal_(signal), output_(output),
       running_(running), mtx_(mtx), frequency_(frequency)
 {
-    pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "ERROR HiloSignal: pthread_create failed with code " << ret << std::endl;
+        throw std::runtime_error("HiloSignal: Failed to create thread");
+    }
 }
 
 /**
@@ -34,7 +40,10 @@ HiloSignal::HiloSignal(std::shared_ptr<Signal> signal, std::shared_ptr<double> o
  * correctamente antes de destruir el objeto HiloSignal.
  */
 HiloSignal::~HiloSignal() {
-    pthread_join(thread_, nullptr);
+    int ret = pthread_join(thread_, nullptr);
+    if (ret != 0) {
+        std::cerr << "WARNING HiloSignal: pthread_join failed with code " << ret << std::endl;
+    }
 }
 
 /**

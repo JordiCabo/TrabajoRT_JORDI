@@ -10,6 +10,7 @@
 #include "HiloSwitch.h"
 #include "../include/Temporizador.h"
 #include <iostream>
+#include <stdexcept>
 #include <csignal>
 
 /**
@@ -21,7 +22,11 @@ HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwit
     : signalSwitch_(signalSwitch), output_(output), running_(running), 
       mtx_(mtx), params_(params), frequency_(frequency)
 {
-    pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "ERROR HiloSwitch: pthread_create failed with code " << ret << std::endl;
+        throw std::runtime_error("HiloSwitch: Failed to create thread");
+    }
 }
 
 /**
@@ -29,7 +34,10 @@ HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwit
  */
 HiloSwitch::~HiloSwitch() {
     void* retVal;
-    pthread_join(thread_, &retVal);
+    int ret = pthread_join(thread_, &retVal);
+    if (ret != 0) {
+        std::cerr << "WARNING HiloSwitch: pthread_join failed with code " << ret << std::endl;
+    }
 }
 
 /**

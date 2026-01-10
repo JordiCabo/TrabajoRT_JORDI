@@ -1,5 +1,7 @@
 #include "HiloIntArranque.h"
 #include "../include/Temporizador.h"
+#include <iostream>
+#include <stdexcept>
 #include <csignal>
 
 volatile sig_atomic_t g_signal_run = 1;
@@ -22,11 +24,18 @@ HiloIntArranque::HiloIntArranque(std::shared_ptr<InterruptorArranque> interrupto
 {
     g_running_ptr = running_.get();
     instalar_manejador_signal();
-    pthread_create(&thread_, nullptr, &HiloIntArranque::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloIntArranque::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "ERROR HiloIntArranque: pthread_create failed with code " << ret << std::endl;
+        throw std::runtime_error("HiloIntArranque: Failed to create thread");
+    }
 }
 
 HiloIntArranque::~HiloIntArranque() {
-    pthread_join(thread_, nullptr);
+    int ret = pthread_join(thread_, nullptr);
+    if (ret != 0) {
+        std::cerr << "WARNING HiloIntArranque: pthread_join failed with code " << ret << std::endl;
+    }
 }
 
 void* HiloIntArranque::threadFunc(void* arg) {

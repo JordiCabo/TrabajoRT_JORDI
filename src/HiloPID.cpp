@@ -8,6 +8,8 @@
 #include "../include/HiloPID.h"
 #include "../include/PIDController.h"
 #include "../include/Temporizador.h"
+#include <iostream>
+#include <stdexcept>
 #include <ctime>
 #include <csignal>
 
@@ -26,7 +28,11 @@ HiloPID::HiloPID(std::shared_ptr<DiscreteSystem> pid,
                  std::shared_ptr<ParametrosCompartidos> params, 
                  double frequency)
     : system_(pid), vars_(vars), params_(params), frequency_(frequency), iterations_(0) {
-    pthread_create(&thread_, nullptr, &HiloPID::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloPID::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "ERROR HiloPID: pthread_create failed with code " << ret << std::endl;
+        throw std::runtime_error("HiloPID: Failed to create thread");
+    }
 }
 
 /**
@@ -37,7 +43,10 @@ HiloPID::HiloPID(std::shared_ptr<DiscreteSystem> pid,
  * Decrementa referencias de shared_ptr automáticamente.
  */
 HiloPID::~HiloPID() {
-    pthread_join(thread_, nullptr);
+    int ret = pthread_join(thread_, nullptr);
+    if (ret != 0) {
+        std::cerr << "WARNING HiloPID: pthread_join failed with code " << ret << std::endl;
+    }
 }
 
 /**

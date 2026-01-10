@@ -7,6 +7,8 @@
 
 #include "Hilo2in.h"
 #include "../include/Temporizador.h"
+#include <iostream>
+#include <stdexcept>
 #include <csignal>
 
 namespace DiscreteSystems {
@@ -40,7 +42,10 @@ Hilo2in::Hilo2in(std::shared_ptr<DiscreteSystem> system,
  * Decrementa referencias de shared_ptr automáticamente.
  */
 Hilo2in::~Hilo2in() {
-    pthread_join(thread_, nullptr);
+    int ret = pthread_join(thread_, nullptr);
+    if (ret != 0) {
+        std::cerr << "WARNING Hilo2in: pthread_join failed with code " << ret << std::endl;
+    }
 }
 
 /**

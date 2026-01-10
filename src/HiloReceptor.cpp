@@ -10,6 +10,7 @@
 #include "HiloReceptor.h"
 #include "../include/Temporizador.h"
 #include <iostream>
+#include <stdexcept>
 #include <csignal>
 
 /**
@@ -21,7 +22,11 @@ HiloReceptor::HiloReceptor(std::shared_ptr<Receptor> receptor,
                            double frequency)
     : receptor_(receptor), running_(running), mtx_(mtx), frequency_(frequency)
 {
-    pthread_create(&thread_, nullptr, &HiloReceptor::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloReceptor::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "ERROR HiloReceptor: pthread_create failed with code " << ret << std::endl;
+        throw std::runtime_error("HiloReceptor: Failed to create thread");
+    }
 }
 
 /**
@@ -29,7 +34,10 @@ HiloReceptor::HiloReceptor(std::shared_ptr<Receptor> receptor,
  */
 HiloReceptor::~HiloReceptor() {
     void* retVal;
-    pthread_join(thread_, &retVal);
+    int ret = pthread_join(thread_, &retVal);
+    if (ret != 0) {
+        std::cerr << "WARNING HiloReceptor: pthread_join failed with code " << ret << std::endl;
+    }
 }
 
 /**

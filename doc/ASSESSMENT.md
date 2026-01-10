@@ -17,7 +17,7 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 
 ## Debilidades
 - Mutex único compartido: posible contención cuando el número de hilos aumenta.
-- Falta de control de errores en `pthread_create/join`: sin verificación de códigos de retorno en algunos hilos.
+- ~~Falta de control de errores en `pthread_create/join`: sin verificación de códigos de retorno en algunos hilos.~~ **✅ CORREGIDO en v1.0.5**: Implementada verificación de retornos con lanzamiento de excepciones en constructores (`pthread_create`) y advertencias en destructores (`pthread_join`).
 - Ausencia de registros (logging) para diagnósticos y trazabilidad.
 - Sin CI/CD: no hay pipelines automáticos de build/test/análisis estático.
 - Configuración de frecuencias/periodos dispersa: no existe una fuente única de verdad.
@@ -25,9 +25,9 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 
 ## Recomendaciones (Corto Plazo)
 - **v1.0.4 COMPLETADO**: Migración a shared_ptr en todas las clases Hilo* (Hilo, Hilo2in, HiloPID, HiloSignal, HiloSwitch, HiloIntArranque, HiloTransmisor, HiloReceptor). Co-propiedad explícita con acceso a POSIX mutex via `.get()`. Compilación exitosa, validación runtime completada.
+- **v1.0.5 FASE 1 COMPLETADA**: Control de errores en threading implementado. Verificación de retornos de `pthread_create` con lanzamiento de `std::runtime_error` en caso de fallo. Verificación de retornos de `pthread_join` con advertencias en stderr. Todos los Hilo* (8 clases) actualizadas con headers `<iostream>` y `<stdexcept>`. Compilación 100% exitosa.
 - Mantener temporización absoluta actual (`Temporizador` + `TIMER_ABSTIME`) y documentar su uso en todos los hilos.
 - Señal de parada: evaluar `std::atomic<bool> running` para reducir overhead y simplificar lectura.
-- Errores de hilo: comprobar retornos de `pthread_create`/`pthread_join`; usar `pthread_exit(nullptr)`.
 - Logging básico: añadir un logger sencillo (timestamp, nombre de hilo, valores clave).
 - Lecturas/escrituras: mantener cómputo (`next(...)`) fuera de la región crítica; consolidar lecturas en un único lock cuando sea posible.
 - Centralizar configuración: definir `Config`/`comm_config.h` como fuente única de frecuencias y tamaños de buffer.
@@ -55,8 +55,10 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 
 ## Roadmap Sugerido
 - **v1.0.4 (COMPLETADO)**: Migración a shared_ptr en threading (Fase 1-3); compilación exitosa; validación runtime.
-- Semana 1–2 (v1.0.5): corto plazo (atomic running, errores de hilos, logging, centralizar configuración, std::mutex en VariablesCompartidas).
-- Semana 3–4 (v1.1.0): medio plazo (instrumentación, CI, mejoras de mutex, evaluación de scheduler).
+- **v1.0.5 Fase 1 (COMPLETADO)**: Control de errores en `pthread_create/join` implementado en todas las 8 clases Hilo*. Excepciones lanzadas en constructores, advertencias en destructores.
+- **v1.0.5 Fase 2-5 (PENDIENTES)**: Logging, configuración centralizada, mutex por variable, SCHED_FIFO/RR.
+- Semana 2–3 (v1.0.5 Fases 2-5): corto plazo (logging, centralizar configuración, mejoras de mutex, evaluación de scheduler).
+- Semana 4–5 (v1.1.0): medio plazo (instrumentación, CI, evaluación avanzada).
 - Mes 2+ (v2.0.0): largo plazo (buffers lock-free, perfiles, extensibilidad, portabilidad).
 
 ## Referencia de Implementación

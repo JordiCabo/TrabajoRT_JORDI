@@ -7,6 +7,8 @@
 
 #include "Hilo.h"
 #include "../include/Temporizador.h"
+#include <iostream>
+#include <stdexcept>
 
 namespace DiscreteSystems {
 
@@ -27,7 +29,11 @@ Hilo::Hilo(std::shared_ptr<DiscreteSystem> system,
            double frequency)
     : system_(system), input_(input), output_(output), mtx_(mtx), frequency_(frequency), running_(running)  
 {
-    pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "ERROR Hilo: pthread_create failed with code " << ret << std::endl;
+        throw std::runtime_error("Hilo: Failed to create thread");
+    }
 }
 
 /**
@@ -38,7 +44,10 @@ Hilo::Hilo(std::shared_ptr<DiscreteSystem> system,
  * Decrementa referencias de shared_ptr automáticamente.
  */
 Hilo::~Hilo() {
-    pthread_join(thread_, nullptr);
+    int ret = pthread_join(thread_, nullptr);
+    if (ret != 0) {
+        std::cerr << "WARNING Hilo: pthread_join failed with code " << ret << std::endl;
+    }
 }
 
 /**
