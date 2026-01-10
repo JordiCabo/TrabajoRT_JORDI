@@ -8,7 +8,8 @@
 
 ## Profesor de la Asignatura
 **Rafael Corsino**
-- Autor de la clase y docente de la asignatura Sistemas en Tiempo Real
+ - Autor del componente `SignalGenerator` (clase y ejemplos)
+ - Docente de la asignatura Sistemas en Tiempo Real
 
 ## Herramientas de Asistencia
 **GitHub Copilot**
@@ -19,11 +20,10 @@
 ## Proyecto
 - **Tipo**: Trabajo Final
 - **Asignatura**: Sistemas en Tiempo Real
-- **Fecha**: Diciembre 2024
+- **Fecha**: Enero 2026
 - **Lenguaje**: C++17
-- **Framework GUI**: Qt6
 
 ## Agradecimientos
 - Profesores de la asignatura Sistemas en Tiempo Real
-- Comunidad de Qt y C++
+- Comunidad de C++
 - Documentación de POSIX threads y message queues
