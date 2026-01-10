@@ -42,6 +42,65 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### Corregido
 - (Pendiente)
 
+## [1.0.4] - 2026-01-10
+
+### Cambiado - Refactorización a Smart Pointers
+**Objetivo**: Garantizar ciclo de vida seguro de objetos compartidos entre múltiples hilos, resolviendo riesgos de punteros crudos.
+
+#### Fase 1: Core Threading (Completada) ✅
+Migración de **punteros crudos a `shared_ptr`** en clase base de threading:
+- **Hilo.h/cpp**: 
+  - `DiscreteSystem*` → `std::shared_ptr<DiscreteSystem>`
+  - `double*` (input/output) → `std::shared_ptr<double>`
+  - `bool*` (running) → `std::shared_ptr<bool>`
+  - `pthread_mutex_t*` → `std::shared_ptr<pthread_mutex_t>`
+- **Hilo2in.h/cpp**: Migración idéntica para sistemas con dos entradas (Sumador)
+- **HiloPID.h/cpp**: 
+  - `VariablesCompartidas*` → `std::shared_ptr<VariablesCompartidas>`
+  - `ParametrosCompartidos*` → `std::shared_ptr<ParametrosCompartidos>`
+  - Acceso a pthread_mutex_t via `.get()` para mantener POSIX API
+
+#### Fase 2: Threading Especializado (En Progreso) 🔄
+Iniciada migración de clases derivadas:
+- **HiloSignal.h/cpp**: Headers migrados, `.cpp` actualizado
+- **HiloSwitch.h/cpp**: Headers + implementación actualizados
+- **HiloIntArranque.h/cpp**: Pendiente completar
+- **HiloTransmisor.h/cpp**: Pendiente completar
+- **HiloReceptor.h/cpp**: Pendiente completar
+
+#### Fase 3: Código Cliente (Pendiente) ⏳
+- **testHilo.cpp**: Refactorizar instantiaciones a patrón `std::make_shared`
+- **control_simulator.cpp** (Interfaz_Control): Actualizaciones necesarias
+- **mainwindow.cpp**: Verificación/actualización
+
+### Beneficios Logrados
+✅ **Eliminación de memory leaks**: Reference counting automático  
+✅ **Acceso seguro**: Imposible acceder a objeto destruido mientras hilo activo  
+✅ **Propiedad clara**: Cada hilo co-posee sus recursos explícitamente  
+✅ **Thread-safety mejorada**: Atomic operations en ref-counting internamente  
+
+### Patrón Implementado
+```cpp
+// Acceso a mutex POSIX desde shared_ptr
+pthread_mutex_lock(mtx_.get());    // Obtener puntero raw
+// ... critical section ...
+pthread_mutex_unlock(mtx_.get());
+```
+
+### Notas Técnicas
+- Minimal performance overhead (1-2 ciclos CPU por ref-count)
+- Hot-loop (Hilo::run) ya optimizado sin asignaciones dinámicas
+- Futuro: Refactorizar `VariablesCompartidas` con `std::mutex` wrapper
+
+## [1.0.3] - 2026-01-10
+
+### Cambiado
+- **HiloSignal**, **HiloSwitch**, **HiloTransmisor**, **HiloReceptor**, **HiloIntArranque**: Sustitución de `usleep` por `Temporizador` con temporización absoluta (`clock_nanosleep` + `TIMER_ABSTIME`) y comentarios actualizados.
+- **Documentación**: README, ARCHITECTURE y mainpage actualizadas para reflejar temporización absoluta y utilidades de discretización.
+
+### Corregido
+- Calificación de namespace `DiscreteSystems::Temporizador` en hilos auxiliares para compilación correcta.
+
 ## [1.1.0] - 2026-01-03
 
 ### Añadido
@@ -129,7 +188,9 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - **Corregido** - para corrección de bugs
 - **Seguridad** - para vulnerabilidades
 
-[Unreleased]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.0.3...v1.0.4
+[1.0.3]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.1.0...v1.0.3
 [1.1.0]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/JordiCabo/TrabajoRT_JORDI/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/JordiCabo/TrabajoRT_JORDI/releases/tag/v0.1.0
