@@ -7,18 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
-### Añadido (v1.0.5 Fase 2+ - Próximamente)
-- Logging básico con timestamp y nombre de hilo
-- Configuración centralizada de frecuencias (Config/comm_config.h)
-- CI/CD con GitHub Actions (build, tests, clang-tidy, sanitizers)
-
-### Cambiado (v1.0.5 Fase 2+ - Próximamente)
-- Reemplazar VariablesCompartidas.mtx (pthread_mutex_t) por `std::mutex` wrapper
-- Evaluar `std::atomic<bool>` para flag de ejecución (running)
+### Planificado para versiones futuras
+- Logging básico con timestamp y nombre de hilo (v1.1.0)
+- Configuración centralizada de frecuencias (v1.1.0)
+- CI/CD con GitHub Actions (v1.1.0)
+- Reemplazar VariablesCompartidas.mtx por `std::mutex` wrapper (v1.1.0)
+- Evaluar `std::atomic<bool>` para flag de ejecución
 - Separación de mutex por variable/estructura (SharedVars pattern)
-
-### Corregido (v1.0.5 Fase 2+ - Próximamente)
-- Errores no controlados en inicialización de Receptor/Transmisor
 
 ## [1.0.5-Fase-1] - 2026-01-10
 

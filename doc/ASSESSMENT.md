@@ -17,7 +17,6 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 
 ## Debilidades
 - Mutex único compartido: posible contención cuando el número de hilos aumenta.
-- ~~Falta de control de errores en `pthread_create/join`: sin verificación de códigos de retorno en algunos hilos.~~ **✅ CORREGIDO en v1.0.5**: Implementada verificación de retornos con lanzamiento de excepciones en constructores (`pthread_create`) y advertencias en destructores (`pthread_join`).
 - Ausencia de registros (logging) para diagnósticos y trazabilidad.
 - Sin CI/CD: no hay pipelines automáticos de build/test/análisis estático.
 - Configuración de frecuencias/periodos dispersa: no existe una fuente única de verdad.
