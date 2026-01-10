@@ -38,6 +38,9 @@ HiloPID::HiloPID(std::shared_ptr<DiscreteSystem> pid,
     // Crear directorio logs/ si no existe
     mkdir("logs", 0755);
     
+    // Inicializar buffer circular
+    timing_buffer_.resize(MAX_LOG_ENTRIES);
+    
     // Crear nombre de archivo con timestamp
     time_t now = time(nullptr);
     struct tm* tm_info = localtime(&now);
@@ -47,27 +50,6 @@ HiloPID::HiloPID(std::shared_ptr<DiscreteSystem> pid,
     std::ostringstream oss;
     oss << "logs/HiloPID_runtime_" << timestamp << ".txt";
     logfile_path_ = oss.str();
-    
-    // Crear archivo y escribir header
-    std::ofstream logfile(logfile_path_);
-    if (logfile.is_open()) {
-        logfile << "HiloPID Runtime Performance Log\n";
-        logfile << "Frequency: " << frequency << " Hz\n";
-        logfile << "Sample Period: " << (1000000.0 / frequency) << " us\n";
-        logfile << "Timestamp: " << timestamp << "\n";
-        logfile << "================================================================================\n";
-        logfile << std::left << std::setw(10) << "Iteration"
-                << std::setw(14) << "t_espera_us"
-                << std::setw(14) << "t_ejec_us"
-                << std::setw(14) << "t_total_us"
-                << std::setw(14) << "periodo_us"
-                << std::setw(10) << "%uso"
-                << std::setw(12) << "Status" << "\n";
-        logfile << "--------------------------------------------------------------------------------\n";
-        logfile.close();
-    } else {
-        std::cerr << "WARNING HiloPID: Could not create log file " << logfile_path_ << std::endl;
-    }
     
     int ret = pthread_create(&thread_, nullptr, &HiloPID::threadFunc, this);
     if (ret != 0) {
@@ -88,6 +70,9 @@ HiloPID::~HiloPID() {
     if (ret != 0) {
         std::cerr << "WARNING HiloPID: pthread_join failed with code " << ret << std::endl;
     }
+    
+    // Volcar buffer circular al archivo antes de destruir
+    flushLogBuffer();
 }
 
 /**
@@ -242,7 +227,7 @@ void HiloPID::run() {
 }
 
 /**
- * @brief Registra datos de timing en el archivo de log con formato de tabla
+ * @brief Registra datos de timing en el buffer circular en memoria
  * 
  * @param iteration Número de iteración
  * @param t_espera_us Tiempo de espera del mutex (microsegundos)
@@ -251,23 +236,101 @@ void HiloPID::run() {
  * @param periodo_us Período de muestreo configurado (microsegundos)
  * @param status Estado: "OK", "WARNING", "CRITICAL", "ERROR_MUTEX"
  * 
+ * @note Buffer circular: iteración 1001 reescribe posición 1 (índice 0)
  * @version 1.0.6
  */
 void HiloPID::logTiming(int iteration, double t_espera_us, double t_ejec_us, 
                         double t_total_us, double periodo_us, const char* status) {
-    std::ofstream logfile(logfile_path_, std::ios::app);
-    if (logfile.is_open()) {
-        double porcentaje_uso = (t_total_us / periodo_us) * 100.0;
-        
-        logfile << std::left << std::setw(10) << iteration
-                << std::setw(14) << std::fixed << std::setprecision(2) << t_espera_us
-                << std::setw(14) << std::fixed << std::setprecision(2) << t_ejec_us
-                << std::setw(14) << std::fixed << std::setprecision(2) << t_total_us
-                << std::setw(14) << std::fixed << std::setprecision(2) << periodo_us
-                << std::setw(10) << std::fixed << std::setprecision(2) << porcentaje_uso
-                << std::setw(12) << status << "\n";
-        logfile.close();
+    // Calcular índice en buffer circular (0-999)
+    size_t index = (iteration - 1) % MAX_LOG_ENTRIES;
+    
+    // Almacenar datos en buffer circular
+    timing_buffer_[index].iteration = iteration;
+    timing_buffer_[index].t_espera_us = t_espera_us;
+    timing_buffer_[index].t_ejec_us = t_ejec_us;
+    timing_buffer_[index].t_total_us = t_total_us;
+    timing_buffer_[index].periodo_us = periodo_us;
+    timing_buffer_[index].porcentaje_uso = (t_total_us / periodo_us) * 100.0;
+    timing_buffer_[index].status = status;
+}
+
+/**
+ * @brief Vuelca el buffer circular completo al archivo de log
+ * 
+ * Escribe hasta 1000 iteraciones más recientes al archivo en formato tabla.
+ * Si se ejecutaron más de 1000 iteraciones, solo escribe las últimas 1000.
+ * 
+ * @version 1.0.6
+ */
+void HiloPID::flushLogBuffer() {
+    std::ofstream logfile(logfile_path_);
+    if (!logfile.is_open()) {
+        std::cerr << "WARNING HiloPID: Could not open log file " << logfile_path_ << " for writing" << std::endl;
+        return;
     }
+    
+    // Escribir header
+    logfile << "HiloPID Runtime Performance Log (Circular Buffer - Last " << MAX_LOG_ENTRIES << " iterations)\n";
+    logfile << "Frequency: " << frequency_ << " Hz\n";
+    logfile << "Sample Period: " << (1000000.0 / frequency_) << " us\n";
+    logfile << "Total Iterations: " << iterations_ << "\n";
+    logfile << "================================================================================\n";
+    logfile << std::left << std::setw(10) << "Iteration"
+            << std::setw(14) << "t_espera_us"
+            << std::setw(14) << "t_ejec_us"
+            << std::setw(14) << "t_total_us"
+            << std::setw(14) << "periodo_us"
+            << std::setw(10) << "%uso"
+            << std::setw(12) << "Status" << "\n";
+    logfile << "--------------------------------------------------------------------------------\n";
+    
+    // Determinar cuántas iteraciones escribir
+    size_t num_entries = (iterations_ < static_cast<int>(MAX_LOG_ENTRIES)) ? iterations_ : MAX_LOG_ENTRIES;
+    
+    if (iterations_ <= static_cast<int>(MAX_LOG_ENTRIES)) {
+        // Menos de 1000 iteraciones: escribir en orden secuencial
+        for (size_t i = 0; i < num_entries; i++) {
+            const auto& data = timing_buffer_[i];
+            logfile << std::left << std::setw(10) << data.iteration
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.t_espera_us
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.t_ejec_us
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.t_total_us
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.periodo_us
+                    << std::setw(10) << std::fixed << std::setprecision(2) << data.porcentaje_uso
+                    << std::setw(12) << data.status << "\n";
+        }
+    } else {
+        // Más de 1000 iteraciones: escribir desde la más antigua a la más reciente
+        // La iteración más antigua en el buffer está en: (iterations_ % MAX_LOG_ENTRIES)
+        size_t oldest_index = iterations_ % MAX_LOG_ENTRIES;
+        
+        // Escribir desde oldest_index hasta el final del buffer
+        for (size_t i = oldest_index; i < MAX_LOG_ENTRIES; i++) {
+            const auto& data = timing_buffer_[i];
+            logfile << std::left << std::setw(10) << data.iteration
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.t_espera_us
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.t_ejec_us
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.t_total_us
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.periodo_us
+                    << std::setw(10) << std::fixed << std::setprecision(2) << data.porcentaje_uso
+                    << std::setw(12) << data.status << "\n";
+        }
+        
+        // Escribir desde el inicio del buffer hasta oldest_index
+        for (size_t i = 0; i < oldest_index; i++) {
+            const auto& data = timing_buffer_[i];
+            logfile << std::left << std::setw(10) << data.iteration
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.t_espera_us
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.t_ejec_us
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.t_total_us
+                    << std::setw(14) << std::fixed << std::setprecision(2) << data.periodo_us
+                    << std::setw(10) << std::fixed << std::setprecision(2) << data.porcentaje_uso
+                    << std::setw(12) << data.status << "\n";
+        }
+    }
+    
+    logfile.close();
+    std::cout << "HiloPID: Log flushed to " << logfile_path_ << " (" << num_entries << " iterations)" << std::endl;
 }
 
 

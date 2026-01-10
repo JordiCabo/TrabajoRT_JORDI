@@ -106,6 +106,23 @@ private:
     double frequency_;                ///< Frecuencia de ejecución en Hz
     pthread_t thread_;                ///< Identificador del hilo pthread
     std::string logfile_path_;        ///< Ruta del archivo de log de timing (v1.0.6)
+    
+    /// @brief Estructura para almacenar datos de timing de una iteración
+    struct TimingData {
+        int iteration;
+        double t_espera_us;
+        double t_ejec_us;
+        double t_total_us;
+        double periodo_us;
+        double porcentaje_uso;
+        std::string status;
+        
+        TimingData() : iteration(0), t_espera_us(0), t_ejec_us(0), 
+                       t_total_us(0), periodo_us(0), porcentaje_uso(0), status("") {}
+    };
+    
+    static constexpr size_t MAX_LOG_ENTRIES = 1000;  ///< Buffer circular de 1000 iteraciones (v1.0.6)
+    std::vector<TimingData> timing_buffer_;           ///< Buffer circular en memoria (v1.0.6)
 
     /**
      * @brief Función estática de punto de entrada del hilo
@@ -138,7 +155,7 @@ private:
     void run();
     
     /**
-     * @brief Registra datos de timing en el archivo de log
+     * @brief Registra datos de timing en el buffer circular en memoria
      * 
      * @param iteration Número de iteración
      * @param t_espera_us Tiempo de espera del mutex (microsegundos)
@@ -147,10 +164,21 @@ private:
      * @param periodo_us Período de muestreo configurado (microsegundos)
      * @param status Estado: "OK", "WARNING", "CRITICAL", "ERROR_MUTEX"
      * 
+     * @note Usa buffer circular de 1000 entradas: iteración 1001 reescribe posición 1
      * @version 1.0.6
      */
     void logTiming(int iteration, double t_espera_us, double t_ejec_us, 
                    double t_total_us, double periodo_us, const char* status);
+    
+    /**
+     * @brief Vuelca el buffer circular completo al archivo de log
+     * 
+     * Escribe las últimas N iteraciones (máximo 1000) al archivo en formato tabla.
+     * Llamado automáticamente en el destructor para persistir los datos.
+     * 
+     * @version 1.0.6
+     */
+    void flushLogBuffer();
 };
 
 } // namespace DiscreteSystems
