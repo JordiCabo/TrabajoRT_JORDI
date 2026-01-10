@@ -1,8 +1,8 @@
 /**
  * @file HiloPID.cpp
- * @brief Implementación del wrapper especializado para PID con parámetros dinámicos
+ * @brief Implementación del wrapper especializado para PID con parámetros dinámicos usando shared_ptr
  * @author Jordi + GitHub Copilot
- * @date 2026-01-03
+ * @date 2026-01-10
  */
 
 #include "../include/HiloPID.h"
@@ -18,9 +18,13 @@ namespace DiscreteSystems {
  * 
  * Crea un nuevo hilo pthread que ejecutará la función threadFunc,
  * iniciando la simulación del PID con actualización dinámica de parámetros.
+ * 
+ * @note shared_ptr incrementa referencias; el hilo mantiene co-propiedad de todos los recursos
  */
-HiloPID::HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars, 
-                 ParametrosCompartidos* params, double frequency)
+HiloPID::HiloPID(std::shared_ptr<DiscreteSystem> pid, 
+                 std::shared_ptr<VariablesCompartidas> vars, 
+                 std::shared_ptr<ParametrosCompartidos> params, 
+                 double frequency)
     : system_(pid), vars_(vars), params_(params), frequency_(frequency), iterations_(0) {
     pthread_create(&thread_, nullptr, &HiloPID::threadFunc, this);
 }
@@ -30,6 +34,7 @@ HiloPID::HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars,
  * 
  * Ejecuta pthread_join() para asegurar que el hilo finaliza
  * correctamente antes de destruir el objeto HiloPID.
+ * Decrementa referencias de shared_ptr automáticamente.
  */
 HiloPID::~HiloPID() {
     pthread_join(thread_, nullptr);
@@ -60,6 +65,11 @@ void* HiloPID::threadFunc(void* arg) {
  * 3. Actualiza ganancias del PID con setGains()
  * 4. Lee error de entrada, ejecuta PID, escribe acción de control
  * 
+ * Accesos a shared_ptr:
+ * - vars_.get()->mtx: obtiene puntero raw para pthread_mutex_lock
+ * - params_.get()->mtx: obtiene puntero raw para pthread_mutex_lock
+ * - *vars_, *params_: acceso seguro garantizado por shared_ptr
+ * 
  * @invariant Período de ejecución = 1/frequency_ segundos
  * @invariant Acceso a vars_ y params_ protegido por sus respectivos mutex
  */
@@ -68,7 +78,7 @@ void HiloPID::run() {
     Temporizador timer(frequency_);
 
     // Cast a PIDController para usar setGains
-    PIDController* pid = dynamic_cast<PIDController*>(system_);
+    PIDController* pid = dynamic_cast<PIDController*>(system_.get());
     
     while (true) {
         // Verificar si debe seguir ejecutando

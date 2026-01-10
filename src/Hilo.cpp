@@ -1,8 +1,8 @@
 /**
  * @file Hilo.cpp
- * @brief Implementación del wrapper de threading para sistemas discretos
+ * @brief Implementación del wrapper de threading para sistemas discretos con shared_ptr
  * @author Jordi + GitHub Copilot
- * @date 2025-12-18
+ * @date 2026-01-10
  */
 
 #include "Hilo.h"
@@ -16,9 +16,16 @@ namespace DiscreteSystems {
  * Crea un nuevo hilo pthread que ejecutará la función threadFunc,
  * iniciando la simulación del sistema a la frecuencia especificada.
  * Instala automáticamente el manejador de señales SIGINT/SIGTERM.
+ * 
+ * @note shared_ptr incrementa referencias; el hilo mantiene co-propiedad de todos los recursos
  */
-Hilo::Hilo(DiscreteSystem* system, double* input, double* output, bool* running,pthread_mutex_t* mtx, double frequency)
-    : system_(system), input_(input), output_(output), mtx_(mtx), frequency_(frequency),running_(running)  
+Hilo::Hilo(std::shared_ptr<DiscreteSystem> system, 
+           std::shared_ptr<double> input, 
+           std::shared_ptr<double> output, 
+           std::shared_ptr<bool> running,
+           std::shared_ptr<pthread_mutex_t> mtx, 
+           double frequency)
+    : system_(system), input_(input), output_(output), mtx_(mtx), frequency_(frequency), running_(running)  
 {
     pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
 }
@@ -28,6 +35,7 @@ Hilo::Hilo(DiscreteSystem* system, double* input, double* output, bool* running,
  * 
  * Ejecuta pthread_join() para asegurar que el hilo finaliza
  * correctamente antes de destruir el objeto Hilo.
+ * Decrementa referencias de shared_ptr automáticamente.
  */
 Hilo::~Hilo() {
     pthread_join(thread_, nullptr);
@@ -55,6 +63,10 @@ void* Hilo::threadFunc(void* arg) {
  * la variable *running_ sea true. Sincroniza entrada y salida mediante
  * el mutex para evitar condiciones de carrera.
  * 
+ * Accesos a shared_ptr:
+ * - mtx_.get(): obtiene puntero POSIX raw del mutex
+ * - *input_, *output_, *running_: acceso dereferenciado seguro (shared_ptr valida puntero)
+ * 
  * @invariant Período de ejecución = 1/frequency_ segundos
  * @invariant Acceso a *input_, *output_ y *running_ solo dentro de lock_guard
  */
@@ -64,9 +76,9 @@ void Hilo::run() {
 
     while (true) {
         bool isRunning;
-        pthread_mutex_lock(mtx_);
+        pthread_mutex_lock(mtx_.get());
         isRunning = *running_;
-        pthread_mutex_unlock(mtx_);
+        pthread_mutex_unlock(mtx_.get());
 
         if (!isRunning) {
             std::cerr << "[Hilo::run] Saliendo: isRunning=" << isRunning << std::endl;
@@ -74,16 +86,15 @@ void Hilo::run() {
         }
 
         double input;
-        pthread_mutex_lock(mtx_);
+        pthread_mutex_lock(mtx_.get());
         input = *input_;
-        pthread_mutex_unlock(mtx_);
+        pthread_mutex_unlock(mtx_.get());
 
         double y = system_->next(input);
 
-        pthread_mutex_lock(mtx_);
+        pthread_mutex_lock(mtx_.get());
         *output_ = y;
-        pthread_mutex_unlock(mtx_);
-
+        pthread_mutex_unlock(mtx_.get());
 
         timer.esperar();
     }

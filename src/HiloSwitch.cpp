@@ -15,8 +15,8 @@
 /**
  * @brief Constructor que crea e inicia el hilo pthread
  */
-HiloSwitch::HiloSwitch(SignalGenerator::SignalSwitch* signalSwitch, double* output,
-                       bool* running, pthread_mutex_t* mtx, ParametrosCompartidos* params,
+HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwitch, std::shared_ptr<double> output,
+                       std::shared_ptr<bool> running, std::shared_ptr<pthread_mutex_t> mtx, std::shared_ptr<ParametrosCompartidos> params,
                        double frequency)
     : signalSwitch_(signalSwitch), output_(output), running_(running), 
       mtx_(mtx), params_(params), frequency_(frequency)
@@ -53,9 +53,9 @@ void HiloSwitch::run() {
 
     while (true) {
         bool isRunning;
-        pthread_mutex_lock(mtx_);
+        pthread_mutex_lock(mtx_.get());
         isRunning = *running_;
-        pthread_mutex_unlock(mtx_);
+        pthread_mutex_unlock(mtx_.get());
 
         if (!isRunning)
             break; // salir si se recibió SIGINT/SIGTERM o running es false
@@ -88,9 +88,9 @@ void HiloSwitch::run() {
         double value = signalSwitch_->next();
 
         // Escribir resultado en variable compartida
-        pthread_mutex_lock(mtx_);
+        pthread_mutex_lock(mtx_.get());
         *output_ = value;
-        pthread_mutex_unlock(mtx_);
+        pthread_mutex_unlock(mtx_.get());
 
         // Esperar hasta completar el período (temporización absoluta)
         timer.esperar();

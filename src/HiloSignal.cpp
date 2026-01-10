@@ -16,9 +16,11 @@ namespace SignalGenerator {
  * 
  * Crea un nuevo hilo pthread que ejecutará la función threadFunc,
  * generando muestras de la señal a la frecuencia especificada.
+ * 
+ * @note shared_ptr incrementa referencias; el hilo mantiene co-propiedad de todos los recursos
  */
-HiloSignal::HiloSignal(Signal* signal, double* output, bool* running,
-                       pthread_mutex_t* mtx, double frequency)
+HiloSignal::HiloSignal(std::shared_ptr<Signal> signal, std::shared_ptr<double> output, std::shared_ptr<bool> running,
+                       std::shared_ptr<pthread_mutex_t> mtx, double frequency)
     : signal_(signal), output_(output),
       running_(running), mtx_(mtx), frequency_(frequency)
 {
@@ -67,9 +69,9 @@ void HiloSignal::run() {
 
     while (true) {
         bool isRunning;
-        pthread_mutex_lock(mtx_);
+        pthread_mutex_lock(mtx_.get());
         isRunning = *running_;
-        pthread_mutex_unlock(mtx_);
+        pthread_mutex_unlock(mtx_.get());
 
         if (!isRunning)
             break; // salir si se recibió SIGINT/SIGTERM o running es false
@@ -78,9 +80,9 @@ void HiloSignal::run() {
         double y = signal_->next();
 
         // Guardarla en la salida compartida
-        pthread_mutex_lock(mtx_);
+        pthread_mutex_lock(mtx_.get());
         *output_ = y;
-        pthread_mutex_unlock(mtx_);
+        pthread_mutex_unlock(mtx_.get());
 
         timer.esperar();
     }

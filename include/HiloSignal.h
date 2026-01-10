@@ -2,7 +2,7 @@
  * @file HiloSignal.h
  * @brief Wrapper de threading para ejecutar generadores de señal en tiempo real con temporización absoluta
  * @author Jordi + GitHub Copilot
- * @date 2025-12-18
+ * @date 2026-01-10
  * 
  * Proporciona ejecución pthread de un generador de señal a una frecuencia fija,
  * con protección de variables compartidas mediante mutex y Temporizador
@@ -10,8 +10,9 @@
  */
 
 #pragma once
-#include <pthread.h>
+#include <memory>
 #include <mutex>
+#include <pthread.h>
 #include <unistd.h>
 #include <csignal>
 #include "SignalGenerator.h"
@@ -52,17 +53,18 @@ public:
     /**
      * @brief Constructor que inicia la ejecución del hilo generador
      * 
-     * @param signal Puntero al generador de señal (Step, Sine, PWM, etc.)
-     * @param output Puntero a la variable donde almacenar la salida generada
-     * @param running Puntero a variable booleana de control; cuando es false, el hilo se detiene
-     * @param mtx Puntero al mutex que protege las variables compartidas
+     * @param signal shared_ptr al generador de señal (Step, Sine, PWM, etc.)
+     * @param output shared_ptr a la variable donde almacenar la salida generada
+     * @param running shared_ptr a variable booleana de control; cuando es false, el hilo se detiene
+     * @param mtx shared_ptr al mutex que protege las variables compartidas
      * @param frequency Frecuencia de ejecución en Hz (período = 1/frequency)
      * 
      * @note El hilo comienza a ejecutarse inmediatamente desde el constructor
      * @note El período de muestreo de la señal debe coincidir con 1/frequency
+     * @note shared_ptr incrementa el contador de referencias; hilo mantiene co-propiedad
      */
-    HiloSignal(Signal* signal, double* output, bool* running,
-               pthread_mutex_t* mtx, double frequency);
+    HiloSignal(std::shared_ptr<Signal> signal, std::shared_ptr<double> output, std::shared_ptr<bool> running,
+               std::shared_ptr<pthread_mutex_t> mtx, double frequency);
 
     /**
      * @brief Destructor que espera a que termine el hilo
@@ -79,10 +81,10 @@ public:
     pthread_t getThread() const { return thread_; }
 
 private:
-    Signal* signal_;            ///< Puntero al generador de señal
-    double* output_;            ///< Puntero a variable de salida compartida
-    bool* running_;             ///< Puntero a variable de control de ejecución
-    pthread_mutex_t* mtx_;           ///< Puntero al mutex POSIX para sincronización
+    std::shared_ptr<Signal> signal_;            ///< Co-propiedad del generador de señal
+    std::shared_ptr<double> output_;            ///< Co-propiedad de variable de salida compartida
+    std::shared_ptr<bool> running_;             ///< Co-propiedad de variable de control de ejecución
+    std::shared_ptr<pthread_mutex_t> mtx_;      ///< Co-propiedad del mutex POSIX para sincronización
     double frequency_;          ///< Frecuencia de ejecución en Hz
 
     pthread_t thread_;          ///< Identificador del hilo pthread
