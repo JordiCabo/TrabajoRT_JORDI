@@ -15,6 +15,79 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - Evaluar `std::atomic<bool>` para flag de ejecución
 - Separación de mutex por variable/estructura (SharedVars pattern)
 
+## [1.0.6] - 2026-01-10
+
+### Añadido - Instrumentación de Timing en HiloPID (COMPLETADA ✅)
+**Objetivo**: Monitorizar rendimiento en tiempo real del regulador crítico (HiloPID) con detección de contención de mutex y cumplimiento de deadlines.
+
+#### Implementación de pthread_mutex_trylock ✅
+- **Antes**: `pthread_mutex_lock()` bloqueaba indefinidamente
+- **Ahora**: `pthread_mutex_trylock()` no bloquea, detecta contención
+- **Umbral crítico**: Si espera > 80% del período → ERROR, salta iteración
+- **Ventaja**: Evita bloqueos en el regulador crítico, mejora determinismo
+
+#### Sistema de Logging de Timing ✅
+Archivo de log automático: `logs/HiloPID_runtime_YYYYMMDD_HHMMSS.txt`
+
+**Formato de tabla:**
+```
+Iteration | t_espera_us | t_ejec_us | t_total_us | periodo_us | %uso | Status
+-------------------------------------------------------------------------
+1         | 0.39        | 14.85     | 15.24      | 10000.00   | 0.15 | OK
+2         | 1.20        | 3.36      | 4.57       | 10000.00   | 0.05 | OK
+```
+
+**Métricas registradas:**
+- `t_espera_us`: Tiempo adquiriendo mutex (detecta contención)
+- `t_ejec_us`: Tiempo de ejecución del PID (overhead computacional)
+- `t_total_us`: Tiempo total del ciclo (validación de deadline)
+- `periodo_us`: Período de muestreo configurado
+- `%uso`: Porcentaje de uso del período (debe ser < 100%)
+
+**Estados de alerta:**
+- `OK`: t_total < 90% período (operación normal)
+- `WARNING`: 90% < t_total < 100% período (cerca del deadline)
+- `CRITICAL`: t_total > 100% período (deadline perdido)
+- `ERROR_MUTEX`: t_espera > 80% período (contención crítica, iteración saltada)
+
+#### Archivos Modificados ✅
+- **include/HiloPID.h**: 
+  - Agregado `std::string logfile_path_` para almacenar ruta del log
+  - Agregado método privado `logTiming()` para escritura eficiente
+  - Documentación Doxygen actualizada a v1.0.6
+
+- **src/HiloPID.cpp**:
+  - Headers adicionales: `<fstream>`, `<iomanip>`, `<sstream>`, `<sys/stat.h>`, `<errno.h>`
+  - Constructor: Crea directorio `logs/` y archivo con timestamp
+  - Método `run()`: Medición con `clock_gettime(CLOCK_MONOTONIC)` en 3 puntos (t0, t1, t2)
+  - Lógica de trylock con validación de umbrales (80%, 90%, 100%)
+  - Método `logTiming()`: Escritura formateada con `std::setw()` y `std::setprecision()`
+
+- **test/testHiloPID_timing.cpp** (NUEVO):
+  - Test dedicado para validar instrumentación
+  - Simula 200 iteraciones a 100 Hz (2 segundos)
+  - Genera log completo con timing real
+
+#### Testing y Validación ✅
+```bash
+$ ./bin/testHiloPID_timing
+=== Test HiloPID v1.0.6 - Timing Instrumentation ===
+HiloPID running. Simulating for 2 seconds...
+Expected iterations: ~200
+✓ 201 iteraciones registradas
+✓ Todos los estados: OK (t_total < 90% período)
+✓ t_espera: 0.6-2.2 us (excelente, sin contención)
+✓ t_ejec: 0.9-14.8 us (overhead mínimo)
+✓ t_total: 1.6-15.2 us (0.02-0.15% del período)
+```
+
+#### Impacto y Beneficios ✅
+- **Determinismo**: Trylock evita bloqueos indefinidos en regulador
+- **Observabilidad**: Logs permiten análisis post-mortem de jitter
+- **Validación RT**: Verifica cumplimiento de requisitos de tiempo real
+- **Debugging**: Identifica contención de mutex y overhead computacional
+- **Calidad**: Data cuantitativa para optimización de frecuencias
+
 ## [1.0.5-Fase-1] - 2026-01-10
 
 ### Corregido - Control de Errores en Threading (COMPLETADA ✅)

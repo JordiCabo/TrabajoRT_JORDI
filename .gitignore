@@ -155,3 +155,4 @@ vgcore.*
 *.gcov
 *.lcov
 coverage/
+logs/

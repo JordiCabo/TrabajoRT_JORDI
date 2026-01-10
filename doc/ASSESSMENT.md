@@ -1,6 +1,6 @@
 # Evaluación del Proyecto PL7
 
-Fecha de evaluación: 10/01/2026 (v1.0.4)
+Fecha de evaluación: 10/01/2026 (v1.0.6)
 
 Este documento resume las fortalezas y debilidades del proyecto, e incluye recomendaciones prácticas de mejora a corto, medio y largo plazo.
 
@@ -14,6 +14,8 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 - Temporización absoluta mediante `Temporizador` (`clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME)`), eliminando drift acumulativo.
 - Utilidad `Discretizer` (método Tustin) para convertir plantas continuas a discretas según período de muestreo.
 - **v1.0.4: Ciclo de vida seguro mediante shared_ptr**: co-propiedad explícita de objetos compartidos entre hilos; eliminación automática de leaks.
+- **v1.0.5: Control de errores robusto**: verificación de retornos en pthread_create/join con excepciones y logging.
+- **v1.0.6: Instrumentación de timing en HiloPID**: trylock para evitar bloqueos, logging automático de métricas de rendimiento (t_espera, t_ejec, t_total, %uso), detección de contención de mutex y deadlines perdidos.
 
 ## Debilidades
 - Mutex único compartido: posible contención cuando el número de hilos aumenta.
@@ -25,6 +27,7 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 ## Recomendaciones (Corto Plazo)
 - **v1.0.4 COMPLETADO**: Migración a shared_ptr en todas las clases Hilo* (Hilo, Hilo2in, HiloPID, HiloSignal, HiloSwitch, HiloIntArranque, HiloTransmisor, HiloReceptor). Co-propiedad explícita con acceso a POSIX mutex via `.get()`. Compilación exitosa, validación runtime completada.
 - **v1.0.5 FASE 1 COMPLETADA**: Control de errores en threading implementado. Verificación de retornos de `pthread_create` con lanzamiento de `std::runtime_error` en caso de fallo. Verificación de retornos de `pthread_join` con advertencias en stderr. Todos los Hilo* (8 clases) actualizadas con headers `<iostream>` y `<stdexcept>`. Compilación 100% exitosa.
+- **v1.0.6 COMPLETADA**: Instrumentación de timing en HiloPID con pthread_mutex_trylock() y logging automático. Detecta contención de mutex (umbral 80%), deadlines perdidos (>100% período), y registra métricas detalladas (t_espera, t_ejec, t_total, %uso) en `logs/HiloPID_runtime_*.txt`. Test dedicado validado con 200+ iteraciones.
 - Mantener temporización absoluta actual (`Temporizador` + `TIMER_ABSTIME`) y documentar su uso en todos los hilos.
 - Señal de parada: evaluar `std::atomic<bool> running` para reducir overhead y simplificar lectura.
 - Logging básico: añadir un logger sencillo (timestamp, nombre de hilo, valores clave).
@@ -55,8 +58,9 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 ## Roadmap Sugerido
 - **v1.0.4 (COMPLETADO)**: Migración a shared_ptr en threading (Fase 1-3); compilación exitosa; validación runtime.
 - **v1.0.5 Fase 1 (COMPLETADO)**: Control de errores en `pthread_create/join` implementado en todas las 8 clases Hilo*. Excepciones lanzadas en constructores, advertencias en destructores.
-- **v1.0.5 Fase 2-5 (PENDIENTES)**: Logging, configuración centralizada, mutex por variable, SCHED_FIFO/RR.
-- Semana 2–3 (v1.0.5 Fases 2-5): corto plazo (logging, centralizar configuración, mejoras de mutex, evaluación de scheduler).
+- **v1.0.6 (COMPLETADO)**: Instrumentación de timing en HiloPID con trylock, logging automático de métricas de rendimiento, detección de contención y deadlines.
+- **v1.0.5 Fase 2-5 (PENDIENTES)**: Logging general, configuración centralizada, mutex por variable, SCHED_FIFO/RR.
+- Semana 2–3 (v1.0.7): corto plazo (logging general, centralizar configuración, mejoras de mutex, evaluación de scheduler).
 - Semana 4–5 (v1.1.0): medio plazo (instrumentación, CI, evaluación avanzada).
 - Mes 2+ (v2.0.0): largo plazo (buffers lock-free, perfiles, extensibilidad, portabilidad).
 

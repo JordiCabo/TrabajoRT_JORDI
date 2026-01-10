@@ -3,6 +3,7 @@
  * @brief Wrapper de threading especializado para controladores PID con parámetros dinámicos
  * @author Jordi + GitHub Copilot
  * @date 2026-01-10
+ * @version 1.0.6 - Added timing instrumentation and trylock mechanism
  * 
  * Proporciona ejecución pthread de un PIDController con actualización dinámica de parámetros
  * (Kp, Ki, Kd) mediante ParametrosCompartidos protegidos con mutex.
@@ -18,6 +19,7 @@
 #include <mutex>
 #include <csignal>
 #include <memory>
+#include <string>
 #include "DiscreteSystem.h"
 #include "VariablesCompartidas.h"
 #include "ParametrosCompartidos.h"
@@ -103,6 +105,7 @@ private:
     int iterations_;                  ///< Número de iteraciones ejecutadas
     double frequency_;                ///< Frecuencia de ejecución en Hz
     pthread_t thread_;                ///< Identificador del hilo pthread
+    std::string logfile_path_;        ///< Ruta del archivo de log de timing (v1.0.6)
 
     /**
      * @brief Función estática de punto de entrada del hilo
@@ -117,13 +120,37 @@ private:
     /**
      * @brief Loop principal de ejecución del hilo con actualización de parámetros
      * 
+     * @version 1.0.6 - Added timing instrumentation and trylock
+     * 
      * Ejecuta el PID en bucle a la frecuencia especificada mientras
      * vars_->running sea true. En cada ciclo:
-     * 1. Lee kp/ki/kd de params_ con lock(params_->mtx)
-     * 2. Actualiza el PID con setKp/setKi/setKd
-     * 3. Lee vars_->e y escribe vars_->u con lock(vars_->mtx)
+     * 1. Intenta adquirir mutex con trylock (no bloquea)
+     * 2. Lee kp/ki/kd de params_ con lock(params_->mtx)
+     * 3. Actualiza el PID con setGains
+     * 4. Lee vars_->e y escribe vars_->u con lock(vars_->mtx)
+     * 5. Registra tiempos de espera, ejecución y uso del período
+     * 
+     * Timing crítico:
+     * - Si t_espera > 80% período → ERROR, salta iteración
+     * - Si t_total > 100% período → CRITICAL, deadline missed
+     * - Si t_total > 90% período → WARNING, near deadline
      */
     void run();
+    
+    /**
+     * @brief Registra datos de timing en el archivo de log
+     * 
+     * @param iteration Número de iteración
+     * @param t_espera_us Tiempo de espera del mutex (microsegundos)
+     * @param t_ejec_us Tiempo de ejecución de la tarea (microsegundos)
+     * @param t_total_us Tiempo total del ciclo (microsegundos)
+     * @param periodo_us Período de muestreo configurado (microsegundos)
+     * @param status Estado: "OK", "WARNING", "CRITICAL", "ERROR_MUTEX"
+     * 
+     * @version 1.0.6
+     */
+    void logTiming(int iteration, double t_espera_us, double t_ejec_us, 
+                   double t_total_us, double periodo_us, const char* status);
 };
 
 } // namespace DiscreteSystems
