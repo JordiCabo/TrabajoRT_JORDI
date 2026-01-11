@@ -28,24 +28,24 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
   - Redirección automática de stderr a `error_log_YYYYMMDD_HHMMSS.txt` para captura centralizada de errores.
   - Signal handler (SIGINT/SIGTERM) para parada limpia de todos los hilos sin errores pthread_join.
   - Frecuencia de comunicación IPC optimizada a 10 Hz (100ms) para balance entre responsividad GUI y overhead del sistema.
+- **Configuración centralizada (v1.0.6)**:
+  - `system_config.h`: Single Source of Truth (SSOT) para frecuencias, períodos, buffers y timeouts.
+  - Namespace `SystemConfig` con constantes constexpr para configuración en tiempo de compilación.
+  - Valores centralizados: `TS_CONTROLLER`, `FREQ_COMPONENT`, `FREQ_COMMUNICATION`, `BUFFER_SIZE_LOGGER`, etc.
 
 ## Debilidades
 - Sin CI/CD: no hay pipelines automáticos de build/test/análisis estático.
-- Configuración de frecuencias/periodos dispersa: no existe una fuente única de verdad centralizada.
 - Scheduling: no se configura `SCHED_FIFO/RR`; jitter depende de la carga del sistema operativo.
 - Logs solo en archivos: no hay visualización en tiempo real de métricas (requiere análisis offline).
 
 ## Recomendaciones (Corto Plazo)
 - Lecturas/escrituras: mantener cómputo (`next(...)`) fuera de la región crítica; consolidar lecturas en un único lock cuando sea posible.
-- Centralizar configuración: definir `Config`/`comm_config.h` como fuente única de frecuencias y tamaños de buffer.
 - Visualización de logs: considerar herramienta de análisis en tiempo real o script para parseo de archivos `*_runtime_*.txt`.
 
 ## Recomendaciones (Medio Plazo)
-- Mutex por variable o estructura: considerar `SharedVars` con mutexes por flujo (ref/error/control/output).
 - Planificador: evaluar `SCHED_FIFO`/`SCHED_RR` (Linux) con prioridades controladas para disminuir jitter.
 - Pruebas: añadir tests de integración del lazo con clocks simulados; pruebas de estrés.
 - CI/CD: GitHub Actions (build + tests + `clang-tidy` + sanitizers).
-- Configuración: centralizar periodos/frecuencias en `Config` (inmutable) pasado a hilos.
 - Análisis de logs: script Python/Bash para generar gráficas de jitter, drift y %uso desde archivos `*_runtime_*.txt`.
 
 ## Recomendaciones (Largo Plazo)
@@ -68,10 +68,14 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
   - Error logging centralizado mediante redirección de stderr a archivo con timestamp.
   - Signal handler para parada limpia con Ctrl+C (SIGINT/SIGTERM).
   - Optimización de frecuencia IPC a 10 Hz (100ms) para reducir overhead.
-- Medio plazo: Instrumentación comparativa de jitter entre hilos, CI/CD con GitHub Actions, mutex por variable si contención lo requiere, script de análisis de logs para gráficas de métricas.
+  - Configuración centralizada en `system_config.h` (Single Source of Truth).
+- Medio plazo: Instrumentación comparativa de jitter entre hilos, CI/CD con GitHub Actions, script de análisis de logs para gráficas de métricas.
 - Largo plazo: Buffers lock-free (SPSC), perfiles de trazas, extensibilidad con plugins, SCHED_FIFO/RR para reducir jitter del SO.
 
 ## Referencia de Implementación
 - Ver `include/Hilo*.h` y `src/Hilo*.cpp` para patrón de acceso sincronizado (leer bajo mutex → computar fuera → escribir bajo mutex).
-- Ver `include/Temporizador.h` y `src/Temporizador.cpp` para el patrón de temporización absoluta.- Ver `include/RuntimeLogger.h` y `src/RuntimeLogger.cpp` para sistema de logging con buffer circular.
-- Ver `test/testHilo.cpp` para signal handler (SIGINT/SIGTERM) y redirección de stderr a `error_log_*.txt`.- Ver `doc/ARCHITECTURE.md` sección “Sincronización y Variables Compartidas” y “Ejecución en Tiempo Real” para detalles del modelo y temporización.
+- Ver `include/Temporizador.h` y `src/Temporizador.cpp` para el patrón de temporización absoluta.
+- Ver `include/RuntimeLogger.h` y `src/RuntimeLogger.cpp` para sistema de logging con buffer circular.
+- Ver `include/system_config.h` para configuración centralizada (SSOT) de frecuencias, períodos y buffers.
+- Ver `test/testHilo.cpp` para signal handler (SIGINT/SIGTERM) y redirección de stderr a `error_log_*.txt`.
+- Ver `doc/ARCHITECTURE.md` sección "Sincronización y Variables Compartidas" y "Ejecución en Tiempo Real" para detalles del modelo y temporización.

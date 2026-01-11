@@ -8,6 +8,7 @@
 #include <sstream>
 #include <iomanip>
 #include <sys/stat.h>
+#include "system_config.h"
 #include "TransferFunctionSystem.h"
 #include "Hilo.h"
 #include "Hilo2in.h"
@@ -96,11 +97,12 @@ int main() {
     //-------------------------------------------------------------
     // ---------------- Frecuencias de muestreo -------------------
     //-------------------------------------------------------------
-    const double Ts_controller = 0.01;          // período PID (s)
-    const double Ts_component  = Ts_controller / 10.0; // resto de componentes
-    const double freq_controller = 1.0 / Ts_controller; // Hz
-    const double freq_component  = 1.0 / Ts_component;  // Hz
-    const double freq_communication = 10.0;   // 10 Hz = 100ms para transmisión/recepción GUI
+    // Usar configuración centralizada desde system_config.h
+    const double Ts_controller = SystemConfig::TS_CONTROLLER;
+    const double Ts_component  = SystemConfig::TS_COMPONENT;
+    const double freq_controller = SystemConfig::FREQ_CONTROLLER;
+    const double freq_component  = SystemConfig::FREQ_COMPONENT;
+    const double freq_communication = SystemConfig::FREQ_COMMUNICATION;
 
     // --- Crear InterruptorArranque y HiloIntArranque ---
     auto interruptor = std::make_shared<InterruptorArranque>();
