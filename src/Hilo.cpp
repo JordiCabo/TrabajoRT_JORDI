@@ -18,10 +18,11 @@ Hilo::Hilo(std::shared_ptr<DiscreteSystem> system,
            std::shared_ptr<double> output, 
            bool* running,
            std::shared_ptr<pthread_mutex_t> mtx, 
-           double frequency)
+           double frequency,
+           const std::string& log_prefix)
     : system_(system), input_(input), output_(output), running_(running), mtx_(mtx), 
-      frequency_(frequency), system_raw_(nullptr), input_raw_(nullptr), output_raw_(nullptr),
-      running_raw_(nullptr), mtx_raw_(nullptr), logger_("Hilo", 1000), iterations_(0)
+    frequency_(frequency), system_raw_(nullptr), input_raw_(nullptr), output_raw_(nullptr),
+    running_raw_(nullptr), mtx_raw_(nullptr), logger_(log_prefix, 1000), iterations_(0)
 {
     logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
@@ -35,10 +36,11 @@ Hilo::Hilo(std::shared_ptr<DiscreteSystem> system,
  * @brief Constructor con punteros crudos (compatibilidad)
  */
 Hilo::Hilo(DiscreteSystem* system, double* input, double* output, bool* running,
-           pthread_mutex_t* mtx, double frequency)
+           pthread_mutex_t* mtx, double frequency,
+           const std::string& log_prefix)
     : system_(nullptr), input_(nullptr), output_(nullptr), running_(nullptr), mtx_(nullptr),
-      frequency_(frequency), system_raw_(system), input_raw_(input), output_raw_(output),
-      running_raw_(running), mtx_raw_(mtx), logger_("Hilo", 1000), iterations_(0)
+    frequency_(frequency), system_raw_(system), input_raw_(input), output_raw_(output),
+    running_raw_(running), mtx_raw_(mtx), logger_(log_prefix, 1000), iterations_(0)
 {
     logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);

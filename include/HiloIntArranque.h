@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <memory>
 #include <atomic>
+#include <string>
 #include "InterruptorArranque.h"
 #include "RuntimeLogger.h"
 
@@ -34,14 +35,16 @@ public:
     HiloIntArranque(std::shared_ptr<InterruptorArranque> interruptor, 
                     bool* running,
                     std::shared_ptr<pthread_mutex_t> mtx, 
-                    double frequency = 10.0);
+                    double frequency,
+                    const std::string& log_prefix);
     
     /**
      * @brief Constructor con punteros crudos (compatibilidad)
      * @deprecated Usar constructor con smart pointers
      */
     HiloIntArranque(InterruptorArranque* interruptor, bool* running, 
-                    pthread_mutex_t* mtx, double frequency = 10.0);
+                    pthread_mutex_t* mtx, double frequency,
+                    const std::string& log_prefix);
     
     ~HiloIntArranque();
 };

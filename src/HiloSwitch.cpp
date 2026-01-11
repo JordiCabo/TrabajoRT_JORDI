@@ -21,11 +21,12 @@ HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwit
                        bool* running,
                        std::shared_ptr<pthread_mutex_t> mtx, 
                        std::shared_ptr<ParametrosCompartidos> params,
-                       double frequency)
+                       double frequency,
+                       const std::string& log_prefix)
     : signalSwitch_(signalSwitch), output_(output), running_(running), 
       mtx_(mtx), params_(params), frequency_(frequency),
       signalSwitch_raw_(nullptr), output_raw_(nullptr), running_raw_(nullptr),
-      mtx_raw_(nullptr), params_raw_(nullptr), logger_("HiloSwitch", 1000), iterations_(0)
+    mtx_raw_(nullptr), params_raw_(nullptr), logger_(log_prefix, 1000), iterations_(0)
 {
     logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
@@ -40,11 +41,12 @@ HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwit
  */
 HiloSwitch::HiloSwitch(SignalGenerator::SignalSwitch* signalSwitch, double* output,
                        bool* running, pthread_mutex_t* mtx, ParametrosCompartidos* params,
-                       double frequency)
+                       double frequency,
+                       const std::string& log_prefix)
     : signalSwitch_(nullptr), output_(nullptr), running_(nullptr), 
       mtx_(nullptr), params_(nullptr), frequency_(frequency),
       signalSwitch_raw_(signalSwitch), output_raw_(output), running_raw_(running),
-      mtx_raw_(mtx), params_raw_(params), logger_("HiloSwitch", 1000), iterations_(0)
+    mtx_raw_(mtx), params_raw_(params), logger_(log_prefix, 1000), iterations_(0)
 {
     logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);

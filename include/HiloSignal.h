@@ -14,6 +14,7 @@
 #include <mutex>
 #include <memory>
 #include <atomic>
+#include <string>
 #include <unistd.h>
 #include <csignal>
 #include "SignalGenerator.h"
@@ -65,7 +66,8 @@ public:
                std::shared_ptr<double> output, 
                bool* running,
                std::shared_ptr<pthread_mutex_t> mtx, 
-               double frequency);
+               double frequency,
+               const std::string& log_prefix);
 
     /**
      * @brief Constructor con punteros crudos (compatibilidad)
@@ -78,7 +80,8 @@ public:
      * @param frequency Frecuencia de ejecución en Hz
      */
     HiloSignal(Signal* signal, double* output, bool* running,
-               pthread_mutex_t* mtx, double frequency);
+               pthread_mutex_t* mtx, double frequency,
+               const std::string& log_prefix);
 
     /**
      * @brief Destructor que espera a que termine el hilo

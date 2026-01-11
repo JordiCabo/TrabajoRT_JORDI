@@ -19,10 +19,11 @@ void instalar_manejador_signal() {
 HiloIntArranque::HiloIntArranque(std::shared_ptr<InterruptorArranque> interruptor, 
                                  bool* running,
                                  std::shared_ptr<pthread_mutex_t> mtx, 
-                                 double frequency)
+                                 double frequency,
+                                 const std::string& log_prefix)
     : interruptor_(interruptor), running_(running), mtx_(mtx), frequency_(frequency),
-      interruptor_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr),
-      logger_("HiloIntArranque", 1000), iterations_(0)
+    interruptor_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr),
+    logger_(log_prefix, 1000), iterations_(0)
 {
     logger_.initializeHilo(frequency);
     instalar_manejador_signal();
@@ -34,10 +35,11 @@ HiloIntArranque::HiloIntArranque(std::shared_ptr<InterruptorArranque> interrupto
 }
 
 HiloIntArranque::HiloIntArranque(InterruptorArranque* interruptor, bool* running, 
-                                 pthread_mutex_t* mtx, double frequency)
+                                 pthread_mutex_t* mtx, double frequency,
+                                 const std::string& log_prefix)
     : interruptor_(nullptr), running_(nullptr), mtx_(nullptr), frequency_(frequency),
-      interruptor_raw_(interruptor), running_raw_(running), mtx_raw_(mtx),
-      logger_("HiloIntArranque", 1000), iterations_(0)
+    interruptor_raw_(interruptor), running_raw_(running), mtx_raw_(mtx),
+    logger_(log_prefix, 1000), iterations_(0)
 {
     logger_.initializeHilo(frequency);
     g_running_ptr = running_raw_;

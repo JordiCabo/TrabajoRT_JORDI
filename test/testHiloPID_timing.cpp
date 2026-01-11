@@ -43,7 +43,7 @@ int main() {
     std::cout << "Logging to logs/HiloPID_runtime_YYYYMMDD_HHMMSS.txt\n\n";
     
     // Crear hilo del PID (comienza automáticamente)
-    HiloPID hiloPID(pid.get(), vars.get(), params.get(), 100);  // 100 Hz
+    HiloPID hiloPID(pid.get(), vars.get(), params.get(), 100, "hiloPID_timing");  // 100 Hz
     
     std::cout << "HiloPID running. Simulating for 2 seconds...\n";
     std::cout << "Expected iterations: ~200\n\n";

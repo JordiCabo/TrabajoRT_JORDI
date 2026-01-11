@@ -44,7 +44,7 @@ int main() {
     std::cout << "Buffer size: 1000 iterations (circular)\n\n";
     
     // Crear hilo del PID (comienza automáticamente)
-    HiloPID hiloPID(pid.get(), vars.get(), params.get(), 1000);  // 1000 Hz para alcanzar >1000 iter
+    HiloPID hiloPID(pid.get(), vars.get(), params.get(), 1000, "hiloPID_circular");  // 1000 Hz para alcanzar >1000 iter
     
     std::cout << "HiloPID running...\n";
     

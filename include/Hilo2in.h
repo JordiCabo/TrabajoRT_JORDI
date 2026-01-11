@@ -17,7 +17,6 @@
 #include <atomic>
 #include <csignal>
 #include "DiscreteSystem.h"
-#include "RuntimeLogger.h"
 
 // Variable de control global para manejo de señales
 extern volatile sig_atomic_t g_signal_run;
@@ -64,7 +63,7 @@ public:
             std::shared_ptr<double> output, 
              bool* running,
             std::shared_ptr<pthread_mutex_t> mtx, 
-            double frequency=100);
+            double frequency);
 
     /**
      * @brief Constructor con punteros crudos (compatibilidad)
@@ -78,8 +77,8 @@ public:
      * @param mtx Puntero al mutex que protege las variables compartidas
      * @param frequency Frecuencia de ejecución en Hz (período = 1/frequency)
      */
-    Hilo2in(DiscreteSystem* system, double* input1, double* input2, double* output, 
-            bool *running, pthread_mutex_t* mtx, double frequency=100);
+        Hilo2in(DiscreteSystem* system, double* input1, double* input2, double* output, 
+            bool *running, pthread_mutex_t* mtx, double frequency);
 
     /**
      * @brief Obtiene el identificador del hilo pthread
@@ -114,9 +113,6 @@ private:
 
     double frequency_;          ///< Frecuencia de ejecución en Hz
     pthread_t thread_;          ///< Identificador del hilo pthread
-    RuntimeLogger logger_;      ///< Logger de timing
-    struct timespec t_prev_iteration_;  ///< Timestamp anterior para cálculo de Ts_Real
-    int iterations_;            ///< Contador de iteraciones
 
     /**
      * @brief Función estática de punto de entrada del hilo

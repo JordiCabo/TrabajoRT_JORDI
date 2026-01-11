@@ -49,6 +49,7 @@ int main() {
     const double Ts_component  = Ts_controller / 10.0; // resto de componentes
     const double freq_controller = 1.0 / Ts_controller; // Hz
     const double freq_component  = 1.0 / Ts_component;  // Hz
+    const double freq_communication = 10.0;   // 10 Hz = 100ms para transmisión/recepción GUI
 
     // --- Crear InterruptorArranque y HiloIntArranque ---
     auto interruptor = std::make_shared<InterruptorArranque>();
@@ -57,7 +58,7 @@ int main() {
     interruptor->setRun(1);
 
     // Crear el hilo del interruptor de arranque/paro (frecuencia de componentes)
-    HiloIntArranque hiloInterruptor(interruptor, running.get(), mtx, freq_component);
+    HiloIntArranque hiloInterruptor(interruptor, running.get(), mtx, freq_component, "hiloInterruptor");
 
     //-------------------------------------------------------------
     // --------- Crear la referencia (SignalSwitch) ---------------
@@ -89,7 +90,7 @@ int main() {
     std::shared_ptr<double> ref(&vars->ref, [](double*){});
     
     // Crear HiloSwitch para ejecutar el switch periódicamente (escribe en vars->ref)
-    HiloSwitch hiloRef(signalSwitch, ref, running.get(), mtx, params, freq_component);
+    HiloSwitch hiloRef(signalSwitch, ref, running.get(), mtx, params, freq_component, "hiloRef");
   
   
     //-------------------------------------------------------------
@@ -118,7 +119,7 @@ int main() {
     // --------------- Crear hilo de la planta --------------------
     //-------------------------------------------------------------
     // Planta lee vars->ua, escribe vars->yk
-    Hilo hiloPlanta(planta, ua, yk, running.get(), mtx, frequency_plant);
+    Hilo hiloPlanta(planta, ua, yk, running.get(), mtx, frequency_plant, "hiloPlanta");
 
     //-------------------------------------------------------------
     // ---------------- Crear ADConverter --------------------------
@@ -128,7 +129,7 @@ int main() {
     auto ADconverter = std::make_shared<ADConverter>(Ts_converter);
     std::shared_ptr<double> ykd(&vars->ykd, [](double*){});
     // ADConverter lee vars->yk, escribe vars->ykd
-    Hilo hiloAD(ADconverter, yk, ykd, running.get(), mtx, freq_component);
+    Hilo hiloAD(ADconverter, yk, ykd, running.get(), mtx, freq_component, "hiloAD");
 
     //-------------------------------------------------------------
     // ---------------- Crear PID ----------------------------------
@@ -145,7 +146,7 @@ int main() {
     auto pid = std::make_shared<PIDController>(params->kp, params->ki, params->kd, Ts_controller);
     
     // HiloPID lee vars->e, escribe vars->u, actualiza parámetros dinámicamente
-    HiloPID hiloPID(pid.get(), vars.get(), params.get(), freq_controller);
+    HiloPID hiloPID(pid.get(), vars.get(), params.get(), freq_controller, "hiloPID");
 
     //-------------------------------------------------------------
     // ---------------- Crear DAConverter --------------------------
@@ -153,7 +154,7 @@ int main() {
     auto DAconverter = std::make_shared<DAConverter>(Ts_converter);
     std::shared_ptr<double> u(&vars->u, [](double*){});
     // DAConverter lee vars->u, escribe vars->ua
-    Hilo hiloDA(DAconverter, u, ua, running.get(), mtx, freq_component); 
+    Hilo hiloDA(DAconverter, u, ua, running.get(), mtx, freq_component, "hiloDA"); 
   
     //-------------------------------------------------------------
     // ---------------- Crear Sumador ------------------------------
@@ -175,9 +176,9 @@ int main() {
     }
     std::cout << "Transmisor inicializado correctamente" << std::endl;
 
-    // --- Crear hilo de transmisión a frecuencia de componentes ---
-    HiloTransmisor hiloTransmisor(transmisor, running.get(), mtx, freq_component);
-    std::cout << "Hilo de transmisión iniciado a " << freq_component << " Hz" << std::endl;
+    // --- Crear hilo de transmisión a frecuencia de comunicación (2 Hz = 500ms) ---
+    HiloTransmisor hiloTransmisor(transmisor, running.get(), mtx, freq_communication);
+    std::cout << "Hilo de transmisión iniciado a " << freq_communication << " Hz (500ms)" << std::endl;
 
     //-------------------------------------------------------------
     // -------- Crear receptor para recibir parámetros via IPC -----
@@ -190,9 +191,9 @@ int main() {
     }
     std::cout << "Receptor inicializado correctamente" << std::endl;
 
-    // --- Crear hilo de recepción a frecuencia de componentes ---
-    HiloReceptor hiloReceptor(receptor, running.get(), mtx, freq_component);
-    std::cout << "Hilo de recepción iniciado a " << freq_component << " Hz" << std::endl;
+    // --- Crear hilo de recepción a frecuencia de comunicación (2 Hz = 500ms) ---
+    HiloReceptor hiloReceptor(receptor, running.get(), mtx, freq_communication);
+    std::cout << "Hilo de recepción iniciado a " << freq_communication << " Hz (500ms)" << std::endl;
 
     //-------------------------------------------------------------
     // ---- Bucle principal: monitorizar salida en tiempo real ----

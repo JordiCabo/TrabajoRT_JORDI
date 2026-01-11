@@ -59,8 +59,9 @@ public:
     /**
      * @brief Constructor
      */
-    HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars, 
-            ParametrosCompartidos* params, double frequency=100);
+        HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars, 
+            ParametrosCompartidos* params, double frequency,
+            const std::string& log_prefix);
 
     pthread_t getThread() const { return thread_; }
     int getIterations() const { return iterations_; }  // Obtener número de iteración actual

@@ -20,10 +20,11 @@ HiloSignal::HiloSignal(std::shared_ptr<Signal> signal,
                        std::shared_ptr<double> output,
                        bool* running,
                        std::shared_ptr<pthread_mutex_t> mtx, 
-                       double frequency)
+                       double frequency,
+                       const std::string& log_prefix)
     : signal_(signal), output_(output), running_(running), mtx_(mtx), 
       frequency_(frequency), signal_raw_(nullptr), output_raw_(nullptr),
-      running_raw_(nullptr), mtx_raw_(nullptr), logger_("HiloSignal", 1000), iterations_(0)
+    running_raw_(nullptr), mtx_raw_(nullptr), logger_(log_prefix, 1000), iterations_(0)
 {
     logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
@@ -37,10 +38,11 @@ HiloSignal::HiloSignal(std::shared_ptr<Signal> signal,
  * @brief Constructor con punteros crudos (compatibilidad)
  */
 HiloSignal::HiloSignal(Signal* signal, double* output, bool* running,
-                       pthread_mutex_t* mtx, double frequency)
+                       pthread_mutex_t* mtx, double frequency,
+                       const std::string& log_prefix)
     : signal_(nullptr), output_(nullptr), running_(nullptr), mtx_(nullptr),
       frequency_(frequency), signal_raw_(signal), output_raw_(output),
-      running_raw_(running), mtx_raw_(mtx), logger_("HiloSignal", 1000), iterations_(0)
+    running_raw_(running), mtx_raw_(mtx), logger_(log_prefix, 1000), iterations_(0)
 {
     logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);

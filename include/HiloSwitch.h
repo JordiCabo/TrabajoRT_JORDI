@@ -17,6 +17,7 @@
 #include <csignal>
 #include <memory>
 #include <atomic>
+#include <string>
 #include "SignalSwitch.h"
 #include "ParametrosCompartidos.h"
 #include "RuntimeLogger.h"
@@ -89,7 +90,8 @@ public:
                bool* running,
                std::shared_ptr<pthread_mutex_t> mtx, 
                std::shared_ptr<ParametrosCompartidos> params,
-               double frequency);
+               double frequency,
+               const std::string& log_prefix);
     
     /**
      * @brief Constructor con punteros crudos (compatibilidad)
@@ -97,7 +99,8 @@ public:
      */
     HiloSwitch(SignalGenerator::SignalSwitch* signalSwitch, double* output,
                bool* running, pthread_mutex_t* mtx, ParametrosCompartidos* params,
-               double frequency);
+               double frequency,
+               const std::string& log_prefix);
     
     /**
      * @brief Destructor que espera terminación del hilo

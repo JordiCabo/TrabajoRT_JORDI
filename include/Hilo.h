@@ -16,6 +16,7 @@
 #include <memory>
 #include <atomic>
 #include <csignal>
+#include <string>
 #include "DiscreteSystem.h"
 #include "RuntimeLogger.h"
 
@@ -76,12 +77,13 @@ public:
      * 
      * @note Esta es la interfaz recomendada para nuevo código
      */
-    Hilo(std::shared_ptr<DiscreteSystem> system, 
+        Hilo(std::shared_ptr<DiscreteSystem> system, 
          std::shared_ptr<double> input, 
          std::shared_ptr<double> output, 
          bool* running,
          std::shared_ptr<pthread_mutex_t> mtx, 
-         double frequency=100);
+         double frequency,
+             const std::string& log_prefix);
 
     /**
      * @brief Constructor con punteros crudos (compatibilidad)
@@ -94,8 +96,9 @@ public:
      * @param mtx Puntero al mutex que protege variables compartidas
      * @param frequency Frecuencia de ejecución en Hz
      */
-    Hilo(DiscreteSystem* system, double* input, double* output, bool *running, 
-         pthread_mutex_t* mtx, double frequency=100);
+            Hilo(DiscreteSystem* system, double* input, double* output, bool *running, 
+                pthread_mutex_t* mtx, double frequency,
+             const std::string& log_prefix);
 
     /**
      * @brief Obtiene el identificador del hilo pthread

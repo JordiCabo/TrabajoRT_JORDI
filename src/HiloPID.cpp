@@ -24,9 +24,10 @@ namespace DiscreteSystems {
  * el hilo pthread que ejecutará el PID con instrumentación de timing.
  */
 HiloPID::HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars, 
-                 ParametrosCompartidos* params, double frequency)
+                 ParametrosCompartidos* params, double frequency,
+                 const std::string& log_prefix)
     : system_(pid), vars_(vars), params_(params), frequency_(frequency), 
-      iterations_(0), logger_("HiloPID", 1000)
+    iterations_(0), logger_(log_prefix, 1000)
 {
     // Inicializar logger con configuración específica de HiloPID
     logger_.initializeHiloPID(frequency);
