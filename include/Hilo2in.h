@@ -13,6 +13,8 @@
 #include <iostream>
 #include <unistd.h>
 #include <mutex>
+#include <memory>
+#include <atomic>
 #include <csignal>
 #include "DiscreteSystem.h"
 
@@ -45,7 +47,27 @@ namespace DiscreteSystems {
 class Hilo2in {
 public:
     /**
-     * @brief Constructor que inicia la ejecución del hilo con dos entradas
+     * @brief Constructor con smart pointers (recomendado)
+     * 
+     * @param system Smart pointer al sistema discreto a ejecutar
+     * @param input1 Smart pointer a la primera variable de entrada
+     * @param input2 Smart pointer a la segunda variable de entrada
+     * @param output Smart pointer a la variable de salida
+     * @param running Smart pointer a variable booleana de control
+     * @param mtx Smart pointer al mutex POSIX compartido
+     * @param frequency Frecuencia de ejecución en Hz
+     */
+    Hilo2in(std::shared_ptr<DiscreteSystem> system, 
+            std::shared_ptr<double> input1, 
+            std::shared_ptr<double> input2, 
+            std::shared_ptr<double> output, 
+            std::shared_ptr<bool> running, 
+            std::shared_ptr<pthread_mutex_t> mtx, 
+            double frequency=100);
+
+    /**
+     * @brief Constructor con punteros crudos (compatibilidad)
+     * @deprecated Usar constructor con smart pointers
      * 
      * @param system Puntero al sistema discreto a ejecutar (debe soportar dos entradas)
      * @param input1 Puntero a la primera variable de entrada del sistema
@@ -54,9 +76,6 @@ public:
      * @param running Puntero a variable booleana de control; cuando es false, el hilo se detiene
      * @param mtx Puntero al mutex que protege las variables compartidas
      * @param frequency Frecuencia de ejecución en Hz (período = 1/frequency)
-     * 
-     * @note El hilo comienza a ejecutarse inmediatamente desde el constructor
-     * @note Para sistemas como Sumador, input1 es la referencia e input2 es la realimentación
      */
     Hilo2in(DiscreteSystem* system, double* input1, double* input2, double* output, 
             bool *running, pthread_mutex_t* mtx, double frequency=100);
@@ -76,15 +95,23 @@ public:
     ~Hilo2in();
 
 private:
-    DiscreteSystem* system_;    ///< Puntero al sistema a ejecutar
-    double* input1_;            ///< Puntero a primera variable de entrada compartida
-    double* input2_;            ///< Puntero a segunda variable de entrada compartida
-    double* output_;            ///< Puntero a variable de salida compartida
-    pthread_mutex_t* mtx_;           ///< Puntero al mutex POSIX para sincronización
-    int iterations_;            ///< Número de iteraciones a ejecutar
-    double frequency_;          ///< Frecuencia de ejecución en Hz
-    bool* running_;             ///< Puntero a variable de control de ejecución
+    // Smart pointers
+    std::shared_ptr<DiscreteSystem> system_;
+    std::shared_ptr<double> input1_;
+    std::shared_ptr<double> input2_;
+    std::shared_ptr<double> output_;
+    std::shared_ptr<bool> running_;
+    std::shared_ptr<pthread_mutex_t> mtx_;
+    
+    // Raw pointers (compatibilidad)
+    DiscreteSystem* system_raw_;
+    double* input1_raw_;
+    double* input2_raw_;
+    double* output_raw_;
+    bool* running_raw_;
+    pthread_mutex_t* mtx_raw_;
 
+    double frequency_;          ///< Frecuencia de ejecución en Hz
     pthread_t thread_;          ///< Identificador del hilo pthread
 
     /**

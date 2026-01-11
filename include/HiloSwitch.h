@@ -15,6 +15,8 @@
 
 #include <pthread.h>
 #include <csignal>
+#include <memory>
+#include <atomic>
 #include "SignalSwitch.h"
 #include "ParametrosCompartidos.h"
 
@@ -79,18 +81,18 @@ extern volatile sig_atomic_t g_signal_run;
 class HiloSwitch {
 public:
     /**
-     * @brief Constructor que crea e inicia el hilo de generación de señal
-     * 
-     * @param signalSwitch Puntero al multiplexor de señales configurado
-     * @param output Puntero a variable de salida compartida donde escribir la señal generada
-     * @param running Puntero a variable booleana de control
-     * @param mtx Puntero al mutex POSIX compartido
-     * @param params Puntero a ParametrosCompartidos para leer signal_type dinámicamente
-     * @param frequency Frecuencia de ejecución en Hz (debe ser >= todas las señales)
-     * 
-     * @note El hilo comienza a ejecutarse inmediatamente
-     * @note La frecuencia debe ser lo suficientemente alta para muestrear la señal más rápida
-     * @note El SignalSwitch debe estar configurado con las señales a usar
+     * @brief Constructor con smart pointers (recomendado)
+     */
+    HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwitch, 
+               std::shared_ptr<double> output,
+               std::shared_ptr<bool> running, 
+               std::shared_ptr<pthread_mutex_t> mtx, 
+               std::shared_ptr<ParametrosCompartidos> params,
+               double frequency);
+    
+    /**
+     * @brief Constructor con punteros crudos (compatibilidad)
+     * @deprecated Usar constructor con smart pointers
      */
     HiloSwitch(SignalGenerator::SignalSwitch* signalSwitch, double* output,
                bool* running, pthread_mutex_t* mtx, ParametrosCompartidos* params,
@@ -108,6 +110,23 @@ public:
     pthread_t getThread() const { return thread_; }
 
 private:
+    // Smart pointers
+    std::shared_ptr<SignalGenerator::SignalSwitch> signalSwitch_;
+    std::shared_ptr<double> output_;
+    std::shared_ptr<bool> running_;
+    std::shared_ptr<pthread_mutex_t> mtx_;
+    std::shared_ptr<ParametrosCompartidos> params_;
+    
+    // Raw pointers (compatibilidad)
+    SignalGenerator::SignalSwitch* signalSwitch_raw_;
+    double* output_raw_;
+    bool* running_raw_;
+    pthread_mutex_t* mtx_raw_;
+    ParametrosCompartidos* params_raw_;
+    
+    double frequency_;                              ///< Frecuencia de ejecución (Hz)
+    pthread_t thread_;                              ///< ID del hilo pthread
+
     /**
      * @brief Función estática para pthread_create
      * @param arg Puntero a la instancia HiloSwitch
@@ -125,14 +144,6 @@ private:
      * 4. Escribe resultado en *output_ con protección mutex
      */
     void run();
-
-    SignalGenerator::SignalSwitch* signalSwitch_;  ///< Puntero al multiplexor
-    double* output_;                                ///< Variable de salida
-    bool* running_;                                 ///< Flag de ejecución
-    pthread_mutex_t* mtx_;                          ///< Mutex POSIX compartido
-    ParametrosCompartidos* params_;                 ///< Parámetros compartidos (signal_type)
-    double frequency_;                              ///< Frecuencia de ejecución (Hz)
-    pthread_t thread_;                              ///< ID del hilo pthread
 };
 
 #endif // HILO_SWITCH_H

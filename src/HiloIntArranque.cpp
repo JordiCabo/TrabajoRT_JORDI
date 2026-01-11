@@ -14,10 +14,23 @@ void instalar_manejador_signal() {
     signal(SIGTERM, manejador_signal);
 }
 
-HiloIntArranque::HiloIntArranque(InterruptorArranque* interruptor, bool* running, pthread_mutex_t* mtx, double frequency)
-    : interruptor_(interruptor), running_(running), mtx_(mtx), frequency_(frequency)
+HiloIntArranque::HiloIntArranque(std::shared_ptr<InterruptorArranque> interruptor, 
+                                 std::shared_ptr<std::atomic<bool>> running, 
+                                 std::shared_ptr<pthread_mutex_t> mtx, 
+                                 double frequency)
+    : interruptor_(interruptor), running_(running), mtx_(mtx), frequency_(frequency),
+      interruptor_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr)
 {
-    g_running_ptr = running_;
+    instalar_manejador_signal();
+    pthread_create(&thread_, nullptr, &HiloIntArranque::threadFunc, this);
+}
+
+HiloIntArranque::HiloIntArranque(InterruptorArranque* interruptor, bool* running, 
+                                 pthread_mutex_t* mtx, double frequency)
+    : interruptor_(nullptr), running_(nullptr), mtx_(nullptr), frequency_(frequency),
+      interruptor_raw_(interruptor), running_raw_(running), mtx_raw_(mtx)
+{
+    g_running_ptr = running_raw_;
     instalar_manejador_signal();
     pthread_create(&thread_, nullptr, &HiloIntArranque::threadFunc, this);
 }
@@ -35,22 +48,38 @@ void* HiloIntArranque::threadFunc(void* arg) {
 void HiloIntArranque::run() {
     DiscreteSystems::Temporizador timer(frequency_);
     
+    // Obtener punteros
+    InterruptorArranque* int_ptr = interruptor_ ? interruptor_.get() : interruptor_raw_;
+    if (!int_ptr) {
+        return;
+    }
+    
     while (true) {
         if (!g_signal_run) {
-            pthread_mutex_lock(mtx_);
-            *running_ = false;
-            pthread_mutex_unlock(mtx_);
+            if (running_) {
+                running_->store(false);
+            } else if (mtx_raw_) {
+                pthread_mutex_lock(mtx_raw_);
+                *running_raw_ = false;
+                pthread_mutex_unlock(mtx_raw_);
+            }
             break;
         }
         
-        int run_state = interruptor_->getRun();
-        pthread_mutex_lock(mtx_);
-        *running_ = (run_state != 0);
-        pthread_mutex_unlock(mtx_);
+        int run_state = int_ptr->getRun();
+        
+        if (running_) {
+            running_->store(run_state != 0);
+        } else if (mtx_raw_) {
+            pthread_mutex_lock(mtx_raw_);
+            *running_raw_ = (run_state != 0);
+            pthread_mutex_unlock(mtx_raw_);
+        }
+        
         if (run_state == 0) {
             break;
         }
         
-        timer.esperar();  // Temporización absoluta
+        timer.esperar();
     }
 }

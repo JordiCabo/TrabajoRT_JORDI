@@ -15,6 +15,8 @@
 
 #include <pthread.h>
 #include <csignal>
+#include <memory>
+#include <atomic>
 #include "Transmisor.h"
 
 // Variable de control global para manejo de señales
@@ -67,16 +69,26 @@ extern volatile sig_atomic_t g_signal_run;
 class HiloTransmisor {
 public:
     /**
-     * @brief Constructor que crea e inicia el hilo de envío
+     * @brief Constructor con smart pointers (recomendado)
+     * 
+     * @param transmisor Smart pointer al objeto Transmisor inicializado
+     * @param running Smart pointer a variable booleana de control
+     * @param mtx Smart pointer al mutex POSIX compartido
+     * @param frequency Frecuencia de envío en Hz
+     */
+    HiloTransmisor(std::shared_ptr<Transmisor> transmisor, 
+                   std::shared_ptr<bool> running, 
+                   std::shared_ptr<pthread_mutex_t> mtx, 
+                   double frequency);
+    
+    /**
+     * @brief Constructor con punteros crudos (compatibilidad)
+     * @deprecated Usar constructor con smart pointers
      * 
      * @param transmisor Puntero al objeto Transmisor inicializado
      * @param running Puntero a variable booleana de control
      * @param mtx Puntero al mutex POSIX compartido
      * @param frequency Frecuencia de envío en Hz (período = 1/frequency)
-     * 
-     * @note El hilo comienza a ejecutarse inmediatamente
-     * @note El Transmisor debe estar ya inicializado antes de pasar a este constructor
-     * @note La frecuencia típicamente es menor que la del lazo (para no saturar mqueue)
      */
     HiloTransmisor(Transmisor* transmisor, bool* running, 
                    pthread_mutex_t* mtx, double frequency);
@@ -108,9 +120,16 @@ private:
      */
     void run();
 
-    Transmisor* transmisor_;        ///< Puntero al transmisor
-    bool* running_;                 ///< Flag de ejecución
-    pthread_mutex_t* mtx_;          ///< Mutex POSIX compartido
+    // Smart pointers
+    std::shared_ptr<Transmisor> transmisor_;
+    std::shared_ptr<bool> running_;
+    std::shared_ptr<pthread_mutex_t> mtx_;
+    
+    // Raw pointers (compatibilidad)
+    Transmisor* transmisor_raw_;
+    bool* running_raw_;
+    pthread_mutex_t* mtx_raw_;
+    
     double frequency_;              ///< Frecuencia de envío (Hz)
     pthread_t thread_;              ///< ID del hilo pthread
 };

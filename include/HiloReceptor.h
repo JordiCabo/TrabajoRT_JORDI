@@ -14,6 +14,8 @@
 
 #include <pthread.h>
 #include <csignal>
+#include <memory>
+#include <atomic>
 #include "Receptor.h"
 
 // Variable de control global para manejo de señales
@@ -61,14 +63,26 @@ extern volatile sig_atomic_t g_signal_run;
 class HiloReceptor {
 public:
     /**
-     * @brief Constructor que crea e inicia el hilo de recepción
+     * @brief Constructor con smart pointers (recomendado)
+     * 
+     * @param receptor Smart pointer al objeto Receptor inicializado
+     * @param running Smart pointer a variable booleana de control
+     * @param mtx Smart pointer al mutex POSIX compartido
+     * @param frequency Frecuencia de recepción en Hz
+     */
+    HiloReceptor(std::shared_ptr<Receptor> receptor, 
+                 std::shared_ptr<bool> running, 
+                 std::shared_ptr<pthread_mutex_t> mtx, 
+                 double frequency);
+    
+    /**
+     * @brief Constructor con punteros crudos (compatibilidad)
+     * @deprecated Usar constructor con smart pointers
      * 
      * @param receptor Puntero al objeto Receptor inicializado
      * @param running Puntero a variable booleana de control
      * @param mtx Puntero al mutex POSIX compartido
      * @param frequency Frecuencia de recepción en Hz
-     * 
-     * @note El hilo comienza a ejecutarse inmediatamente
      */
     HiloReceptor(Receptor* receptor, bool* running, 
                  pthread_mutex_t* mtx, double frequency);
@@ -100,9 +114,16 @@ private:
      */
     void run();
 
-    Receptor* receptor_;            ///< Puntero al receptor
-    bool* running_;                 ///< Flag de ejecución
-    pthread_mutex_t* mtx_;          ///< Mutex POSIX compartido
+    // Smart pointers
+    std::shared_ptr<Receptor> receptor_;
+    std::shared_ptr<bool> running_;
+    std::shared_ptr<pthread_mutex_t> mtx_;
+    
+    // Raw pointers (compatibilidad)
+    Receptor* receptor_raw_;
+    bool* running_raw_;
+    pthread_mutex_t* mtx_raw_;
+    
     double frequency_;              ///< Frecuencia de recepción (Hz)
     pthread_t thread_;              ///< ID del hilo pthread
 };

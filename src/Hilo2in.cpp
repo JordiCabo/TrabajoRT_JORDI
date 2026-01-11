@@ -12,15 +12,32 @@
 namespace DiscreteSystems {
 
 /**
- * @brief Constructor que crea e inicia el hilo pthread con dos entradas
- * 
- * Crea un nuevo hilo pthread que ejecutará la función threadFunc,
- * iniciando la simulación del sistema a la frecuencia especificada.
+ * @brief Constructor con smart pointers (recomendado)
+ */
+Hilo2in::Hilo2in(std::shared_ptr<DiscreteSystem> system, 
+                 std::shared_ptr<double> input1, 
+                 std::shared_ptr<double> input2, 
+                 std::shared_ptr<double> output, 
+                 std::shared_ptr<bool> running, 
+                 std::shared_ptr<pthread_mutex_t> mtx, 
+                 double frequency)
+    : system_(system), input1_(input1), input2_(input2), output_(output),
+      running_(running), mtx_(mtx), frequency_(frequency),
+      system_raw_(nullptr), input1_raw_(nullptr), input2_raw_(nullptr),
+      output_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr)
+{
+    pthread_create(&thread_, nullptr, &Hilo2in::threadFunc, this);
+}
+
+/**
+ * @brief Constructor con punteros crudos (compatibilidad)
  */
 Hilo2in::Hilo2in(DiscreteSystem* system, double* input1, double* input2, double* output,
                  bool *running, pthread_mutex_t* mtx, double frequency)
-    : system_(system), input1_(input1), input2_(input2), output_(output),
-      running_(running), mtx_(mtx), frequency_(frequency)
+    : system_(nullptr), input1_(nullptr), input2_(nullptr), output_(nullptr),
+      running_(nullptr), mtx_(nullptr), frequency_(frequency),
+      system_raw_(system), input1_raw_(input1), input2_raw_(input2),
+      output_raw_(output), running_raw_(running), mtx_raw_(mtx)
 {
     pthread_create(&thread_, nullptr, &Hilo2in::threadFunc, this);
 }
@@ -64,26 +81,38 @@ void Hilo2in::run() {
     // Temporizador con retardo absoluto para evitar drift
     Temporizador timer(frequency_);
 
+    // Obtener punteros a los objetos
+    DiscreteSystem* sys = system_ ? system_.get() : system_raw_;
+    double* in1 = input1_ ? input1_.get() : input1_raw_;
+    double* in2 = input2_ ? input2_.get() : input2_raw_;
+    double* out = output_ ? output_.get() : output_raw_;
+    bool* run = running_ ? running_.get() : running_raw_;
+    pthread_mutex_t* mtx = mtx_ ? mtx_.get() : mtx_raw_;
+    
+    if (!sys || !in1 || !in2 || !out || !run || !mtx) {
+        return;
+    }
+
     while (true) {
         bool isRunning;
-        pthread_mutex_lock(mtx_);
-        isRunning = *running_;
-        pthread_mutex_unlock(mtx_);
+        pthread_mutex_lock(mtx);
+        isRunning = *run;
+        pthread_mutex_unlock(mtx);
 
         if (!isRunning)
             break; // salir si se recibió SIGINT/SIGTERM o running_ es false
 
-        double in1, in2;
-        pthread_mutex_lock(mtx_);
-        in1 = *input1_;
-        in2 = *input2_;
-        pthread_mutex_unlock(mtx_);
+        double in1_val, in2_val;
+        pthread_mutex_lock(mtx);
+        in1_val = *in1;
+        in2_val = *in2;
+        pthread_mutex_unlock(mtx);
 
-        double y = system_->next(in1, in2);
+        double y = sys->next(in1_val, in2_val);
 
-        pthread_mutex_lock(mtx_);
-        *output_ = y;
-        pthread_mutex_unlock(mtx_);
+        pthread_mutex_lock(mtx);
+        *out = y;
+        pthread_mutex_unlock(mtx);
 
         timer.esperar();
     }
