@@ -17,7 +17,7 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 ## Debilidades
 - Mutex único compartido: posible contención cuando el número de hilos aumenta.
 - Falta de control de errores en `pthread_create/join`: sin verificación de códigos de retorno en algunos hilos.
-- Señales de control y variables compartidas en punteros crudos: riesgos de ciclo de vida si no se gestionan cuidadosamente.
+- ~~Señales de control y variables compartidas en punteros crudos: riesgos de ciclo de vida si no se gestionan cuidadosamente.~~ **[RESUELTO]** Todas las clases `Hilo*` ahora usan smart pointers (`std::shared_ptr`) con interfaz dual para compatibilidad.
 - Ausencia de registros (logging) para diagnósticos y trazabilidad.
 - Sin CI/CD: no hay pipelines automáticos de build/test/análisis estático.
 - Configuración de frecuencias/periodos dispersa: no existe una fuente única de verdad.
