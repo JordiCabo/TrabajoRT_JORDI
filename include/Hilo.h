@@ -13,6 +13,8 @@
 #include <iostream>
 #include <unistd.h>
 #include <mutex>
+#include <memory>
+#include <atomic>
 #include <csignal>
 #include "DiscreteSystem.h"
 
@@ -62,17 +64,34 @@ namespace DiscreteSystems {
 class Hilo {
 public:
     /**
-     * @brief Constructor que inicia la ejecución del hilo e instala el manejador de señales
+     * @brief Constructor con smart pointers (recomendado)
      * 
-     * @param system Puntero al sistema discreto a ejecutar (PID, función de transferencia, etc.)
-     * @param input Puntero a la variable de entrada del sistema
-     * @param output Puntero a la variable de salida del sistema
-     * @param running Puntero a variable booleana de control; cuando es false, el hilo se detiene
-     * @param mtx Puntero al mutex que protege las variables compartidas
-     * @param frequency Frecuencia de ejecución en Hz (período = 1/frequency)
+     * @param system Smart pointer al sistema discreto a ejecutar
+     * @param input Smart pointer a variable de entrada
+     * @param output Smart pointer a variable de salida
+     * @param running Smart pointer a variable booleana de control
+     * @param mtx Smart pointer al mutex que protege variables compartidas
+     * @param frequency Frecuencia de ejecución en Hz
      * 
-     * @note El hilo comienza a ejecutarse inmediatamente desde el constructor
-     * @note El período de muestreo interno del sistema debe coincidir con 1/frequency
+     * @note Esta es la interfaz recomendada para nuevo código
+     */
+    Hilo(std::shared_ptr<DiscreteSystem> system, 
+         std::shared_ptr<double> input, 
+         std::shared_ptr<double> output, 
+         std::shared_ptr<std::atomic<bool>> running,
+         std::shared_ptr<pthread_mutex_t> mtx, 
+         double frequency=100);
+
+    /**
+     * @brief Constructor con punteros crudos (compatibilidad)
+     * @deprecated Usar constructor con smart pointers en nuevo código
+     * 
+     * @param system Puntero al sistema discreto a ejecutar
+     * @param input Puntero a variable de entrada
+     * @param output Puntero a variable de salida
+     * @param running Puntero a variable booleana de control
+     * @param mtx Puntero al mutex que protege variables compartidas
+     * @param frequency Frecuencia de ejecución en Hz
      */
     Hilo(DiscreteSystem* system, double* input, double* output, bool *running, 
          pthread_mutex_t* mtx, double frequency=100);
@@ -85,39 +104,28 @@ public:
 
     /**
      * @brief Destructor que espera a que termine el hilo
-     * 
-     * Ejecuta pthread_join() para asegurar que el hilo finaliza
-     * correctamente antes de destruir el objeto.
      */
     ~Hilo();
 
 private:
-    DiscreteSystem* system_;    ///< Puntero al sistema a ejecutar
-    double* input_;             ///< Puntero a variable de entrada compartida
-    double* output_;            ///< Puntero a variable de salida compartida
-    pthread_mutex_t* mtx_;           ///< Puntero al mutex POSIX para sincronización
-    int iterations_;            ///< Número de iteraciones a ejecutar
-    double frequency_;          ///< Frecuencia de ejecución en Hz
-    bool* running_;             ///< Puntero a variable de control de ejecución
+    // Miembros smart pointer (nueva interfaz)
+    std::shared_ptr<DiscreteSystem> system_;
+    std::shared_ptr<double> input_;
+    std::shared_ptr<double> output_;
+    std::shared_ptr<std::atomic<bool>> running_;
+    std::shared_ptr<pthread_mutex_t> mtx_;
+    
+    // Miembros puntero crudo (interfaz antigua, compatibilidad)
+    DiscreteSystem* system_raw_;
+    double* input_raw_;
+    double* output_raw_;
+    bool* running_raw_;
+    pthread_mutex_t* mtx_raw_;
 
-    pthread_t thread_;          ///< Identificador del hilo pthread
+    pthread_t thread_;
+    double frequency_;
 
-    /**
-     * @brief Función estática de punto de entrada del hilo
-     * 
-     * @param arg Puntero a this (el objeto Hilo)
-     * @return nullptr
-     * 
-     * @note Esta es la función que pthread llama; internamente invoca run()
-     */
     static void* threadFunc(void* arg);
-
-    /**
-     * @brief Loop principal de ejecución del hilo
-     * 
-     * Ejecuta el sistema en bucle a la frecuencia especificada mientras
-     * *running_ sea true. Sincroniza entrada/salida con el mutex.
-     */
     void run();
 };
 
