@@ -5,6 +5,38 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.5] - 2026-01-11
+
+### Añadido
+- **Control de errores pthread**: Todas las clases `Hilo*` ahora verifican códigos de retorno:
+  - `pthread_create`: Lanza `std::runtime_error` si falla, con mensaje en `stderr`.
+  - `pthread_join`: Registra error en `stderr` si falla (no lanza excepción en destructor).
+- **Includes necesarios**: `<iostream>` y `<stdexcept>` añadidos en clases que los necesitan.
+
+### Cambiado
+- **Variable running**: Revertida de `std::shared_ptr<std::atomic<bool>>` a `bool*` (puntero crudo) como en v1.0.3 para simplificar sincronización con mutex existente.
+- **HiloPID**: Simplificado a interfaz única con punteros crudos (eliminada interfaz dual con smart pointers).
+- **testHilo.cpp**: 
+  - Usa `vars->ref`, `vars->e`, `vars->u`, `vars->yk` (no variables locales).
+  - Inicialización: `running=false` controlado por `HiloIntArranque`, `vars->running=true` para `HiloPID`.
+  - Protección mutex correcta para todas las variables compartidas.
+  - Límite de 40 iteraciones y Ctrl+C funcional.
+- **testHiloPID_circular.cpp, testHiloPID_timing.cpp**: Actualizados para usar `.get()` con nueva interfaz de HiloPID.
+
+### Corregido
+- **ASSESSMENT.md**: Debilidad "Falta de control de errores en pthread_create/join" marcada como **RESUELTA en v1.0.5**.
+- **Flujo de datos**: HiloPID ahora procesa correctamente usando las mismas variables que otros hilos (`vars->e`, `vars->u`).
+
+### Técnico
+- Patrón de error handling: 
+  ```cpp
+  int ret = pthread_create(&thread_, nullptr, &Class::threadFunc, this);
+  if (ret != 0) {
+      std::cerr << "[Class] Error: pthread_create falló con código " << ret << std::endl;
+      throw std::runtime_error("Class - pthread_create falló");
+  }
+  ```
+
 ## [1.0.4] - 2026-01-11
 
 ### Cambiado

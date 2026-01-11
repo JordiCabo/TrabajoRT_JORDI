@@ -1,6 +1,6 @@
 # Evaluación del Proyecto PL7
 
-Fecha de evaluación: 10/01/2026
+Fecha de evaluación: 11/01/2026 (Actualización v1.0.5)
 
 Este documento resume las fortalezas y debilidades del proyecto, e incluye recomendaciones prácticas de mejora a corto, medio y largo plazo.
 
@@ -13,19 +13,17 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 - Buffer circular y ejecución a frecuencia fija: enfoque realista para tiempo real blando.
 - Temporización absoluta mediante `Temporizador` (`clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME)`), eliminando drift acumulativo.
 - Utilidad `Discretizer` (método Tustin) para convertir plantas continuas a discretas según período de muestreo.
+- Control de errores pthread robusto: verificación de retornos en todas las clases `Hilo*` (v1.0.5).
+- Sincronización de variables compartidas con mutex protegiendo todas las operaciones críticas.
 
 ## Debilidades
 - Mutex único compartido: posible contención cuando el número de hilos aumenta.
-- Falta de control de errores en `pthread_create/join`: sin verificación de códigos de retorno en algunos hilos.
 - Ausencia de registros (logging) para diagnósticos y trazabilidad.
 - Sin CI/CD: no hay pipelines automáticos de build/test/análisis estático.
 - Configuración de frecuencias/periodos dispersa: no existe una fuente única de verdad.
 - Scheduling: no se configura `SCHED_FIFO/RR`; jitter depende de la carga del sistema.
 
 ## Recomendaciones (Corto Plazo)
-- Mantener temporización absoluta actual (`Temporizador` + `TIMER_ABSTIME`) y documentar su uso en todos los hilos.
-- Señal de parada: evaluar `std::atomic<bool> running` para reducir overhead y simplificar lectura.
-- Errores de hilo: comprobar retornos de `pthread_create`/`pthread_join`; usar `pthread_exit(nullptr)`.
 - Logging básico: añadir un logger sencillo (timestamp, nombre de hilo, valores clave).
 - Lecturas/escrituras: mantener cómputo (`next(...)`) fuera de la región crítica; consolidar lecturas en un único lock cuando sea posible.
 - Centralizar configuración: definir `Config`/`comm_config.h` como fuente única de frecuencias y tamaños de buffer.
@@ -47,13 +45,13 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 
 ## Riesgos y Mitigaciones
 - Contención de mutex: mantener regiones críticas cortas; separar mutex por variable si crece el número de hilos.
-- Deriva temporal: mitigada por `Temporizador` con `TIMER_ABSTIME`; considerar `SCHED_FIFO/RR` si el jitter debe reducirse.
-- Fugas/manejo de recursos: revisar retornos de API pthread; evitar asignaciones innecesarias en caminos de salida.
+- Deriva temporal: ✅ **MITIGADO** por `Temporizador` con `TIMER_ABSTIME`; considerar `SCHED_FIFO/RR` si el jitter debe reducirse aún más.
+- Fugas/manejo de recursos: ✅ **MITIGADO en v1.0.5** revisando retornos de API pthread en todas las clases `Hilo*`; evitar asignaciones innecesarias en caminos de salida.
 
 ## Roadmap Sugerido
-- Semana 1–2: corto plazo (atomic running, errores de hilos, logging, centralizar configuración).
-- Semana 3–4: medio plazo (instrumentación, CI, mejoras de mutex, evaluación de scheduler).
-- Mes 2+: largo plazo (buffers lock-free, perfiles, extensibilidad, portabilidad).
+- Corto plazo (próximo): Logging básico, centralizar configuración en `Config`.
+- Medio plazo: Instrumentación (jitter/latencias), CI/CD con GitHub Actions, mutex por variable.
+- Largo plazo: Buffers lock-free (SPSC), perfiles de trazas, extensibilidad con plugins.
 
 ## Referencia de Implementación
 - Ver `include/Hilo*.h` y `src/Hilo*.cpp` para patrón de acceso sincronizado (leer bajo mutex → computar fuera → escribir bajo mutex).
