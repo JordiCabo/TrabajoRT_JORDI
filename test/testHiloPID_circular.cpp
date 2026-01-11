@@ -60,8 +60,9 @@ int main() {
         pthread_mutex_unlock(&vars->mtx);
         
         if (i % 3 == 0) {
+            int k = hiloPID.getIterations();  // Obtener iteración real del hilo
             std::cout << "t=" << (i * 0.1) << "s | ";
-            std::cout << "~" << ((i+1) * 100) << " iterations\n";
+            std::cout << "k=" << k << " iterations\n";
         }
     }
     

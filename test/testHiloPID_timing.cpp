@@ -62,6 +62,8 @@ int main() {
         pthread_mutex_unlock(&vars->mtx);
         
         if (i % 5 == 0) {
+            int k = hiloPID.getIterations();  // Obtener iteración real del hilo
+            std::cout << "k=" << k << " | ";
             std::cout << "t=" << (i * 0.1) << "s | ";
             std::cout << "ref=" << vars->ref << " | ";
             std::cout << "yk=" << vars->yk << " | ";

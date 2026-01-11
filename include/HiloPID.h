@@ -2,7 +2,8 @@
  * @file HiloPID.h
  * @brief Wrapper de threading especializado para controladores PID con parámetros dinámicos
  * @author Jordi + GitHub Copilot
- * @date 2026-01-03
+ * @date 2026-01-11
+ * @version 1.0.6 - Added timing instrumentation and logging
  * 
  * Proporciona ejecución pthread de un PIDController con actualización dinámica de parámetros
  * (Kp, Ki, Kd) mediante ParametrosCompartidos protegidos con mutex.
@@ -16,6 +17,8 @@
 #include <memory>
 #include <atomic>
 #include <csignal>
+#include <deque>
+#include <string>
 #include "DiscreteSystem.h"
 #include "VariablesCompartidas.h"
 #include "ParametrosCompartidos.h"
@@ -61,6 +64,7 @@ public:
             ParametrosCompartidos* params, double frequency=100);
 
     pthread_t getThread() const { return thread_; }
+    int getIterations() const { return iterations_; }  // Obtener número de iteración actual
 
     ~HiloPID();
 
@@ -71,9 +75,17 @@ private:
 
     double frequency_;
     pthread_t thread_;
+    int iterations_;           // Contador de iteraciones
+    std::string logfile_path_;  // Ruta del archivo de log
+    std::deque<std::string> log_buffer_;  // Buffer circular de últimas 1000 líneas
+    static const int MAX_LOG_LINES = 1000; // Máximo de líneas en el log
+    struct timespec t_prev_iteration_;  // Timestamp de la iteración anterior
 
     static void* threadFunc(void* arg);
     void run();
+    void logTiming(int iteration, double t_espera_us, double t_ejec_us,
+                   double t_total_us, double periodo_us, double ts_real_us, const char* status);
+    void writeLogFile();  // Escribe el buffer al archivo
 };
 
 } // namespace DiscreteSystems

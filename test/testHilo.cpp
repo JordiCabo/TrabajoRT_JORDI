@@ -197,7 +197,6 @@ int main() {
     //-------------------------------------------------------------
     // ---- Bucle principal: monitorizar salida en tiempo real ----
     //-------------------------------------------------------------
-    int k=0;
     
     while(true) {
         // Leer todas las variables compartidas con protección de mutex
@@ -228,6 +227,9 @@ int main() {
         // Permitir salida con Ctrl+C o por límite de iteraciones
         if (!running_now) break;
 
+        // Obtener el número de iteración real del HiloPID
+        int k = hiloPID.getIterations();
+
         std::cout << "k=" << k
                   << " | Ref=" << ref_val
                   << " | e=" << e_val
@@ -240,7 +242,6 @@ int main() {
                   << " | Signal=" << signal_type_actual << " (0=step,1=sine,2=pwm)"
                   << " | t=" << transmisor->getTiempoTranscurrido() << "s"
                   << std::endl;
-        k++;
         usleep(50000); // 50 ms entre impresiones
     }
     
