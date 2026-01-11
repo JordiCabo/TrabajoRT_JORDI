@@ -54,8 +54,8 @@ void signalHandler(int signum) {
 }
 
 int main() {
-    // --- Crear directorio de logs ---
-    mkdir("logs", 0755);
+    // --- Crear directorio de logs en raíz del proyecto ---
+    mkdir("../logs", 0755);
     
     // --- Redirigir stderr a archivo con timestamp ---
     time_t now = time(nullptr);
@@ -64,7 +64,7 @@ int main() {
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
     
     std::ostringstream error_file;
-    error_file << "logs/error_log_" << timestamp << ".txt";
+    error_file << "../logs/error_log_" << timestamp << ".txt";
     
     FILE* error_log = freopen(error_file.str().c_str(), "w", stderr);
     if (error_log) {
