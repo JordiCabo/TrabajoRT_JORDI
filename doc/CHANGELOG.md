@@ -5,6 +5,26 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.4] - 2026-01-11
+
+### Cambiado
+- **Todas las clases Hilo\***: Refactorización completa de punteros crudos a `std::shared_ptr` (smart pointers) con interfaz dual para compatibilidad:
+  - `Hilo`: `DiscreteSystem*` → `std::shared_ptr<DiscreteSystem>`, `double*` → `std::shared_ptr<double>`, `bool*` → `std::shared_ptr<std::atomic<bool>>`
+  - `HiloSignal`: `Signal*` → `std::shared_ptr<Signal>`
+  - `HiloPID`: `DiscreteSystem*`, `VariablesCompartidas*`, `ParametrosCompartidos*` → smart pointers
+  - `HiloSwitch`: `SignalSwitch*` → `std::shared_ptr<SignalSwitch>`
+  - `Hilo2in`: `DiscreteSystem*` → `std::shared_ptr<DiscreteSystem>`
+  - `HiloReceptor`: `Receptor*` → `std::shared_ptr<Receptor>`
+  - `HiloTransmisor`: `Transmisor*` → `std::shared_ptr<Transmisor>`
+  - `HiloIntArranque`: `InterruptorArranque*` → `std::shared_ptr<InterruptorArranque>`
+- Cada clase mantiene constructores deprecados con punteros crudos para compatibilidad hacia atrás.
+- **Documentación (ASSESSMENT.md)**: Debilidad #20 ("Punteros crudos con riesgos de ciclo de vida") marcada como **RESUELTA**.
+
+### Ventajas
+- Gestión automática de memoria y ciclo de vida.
+- Prevención de fugas de memoria y dangling pointers.
+- Código más seguro y mantenible siguiendo mejores prácticas C++17.
+
 ## [1.0.3] - 2026-01-10
 
 ### Cambiado
