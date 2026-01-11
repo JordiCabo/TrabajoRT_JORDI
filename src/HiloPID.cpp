@@ -168,12 +168,34 @@ void HiloPID::run() {
         
         // === EJECUCIÓN DE TAREA ===
         
-        // 2. Leer parámetros dinámicos (kp, ki, kd) con su propio mutex
-        pthread_mutex_lock(&params_->mtx);
-        double kp = params_->kp;
+        // 2. Leer parámetros dinámicos (kp, ki, kd) con timeout de 20% período
+        double timeout_20pct = 0.2 * periodo_us;
+        struct timespec timeout_params;
+        clock_gettime(CLOCK_MONOTONIC, &timeout_params);
+        long timeout_ns = (long)(timeout_20pct * 1000);
+        timeout_params.tv_nsec += timeout_ns;
+        if (timeout_params.tv_nsec >= 1000000000L) {
+            timeout_params.tv_sec += timeout_params.tv_nsec / 1000000000L;
+            timeout_params.tv_nsec %= 1000000000L;
+        }
+        
+        double kp = params_->kp;  // cache por defecto
         double ki = params_->ki;
         double kd = params_->kd;
-        pthread_mutex_unlock(&params_->mtx);
+        
+        int ret_params = pthread_mutex_timedlock(&params_->mtx, &timeout_params);
+        if (ret_params == 0) {
+            // Lock adquirido, leer parámetros frescos
+            kp = params_->kp;
+            ki = params_->ki;
+            kd = params_->kd;
+            pthread_mutex_unlock(&params_->mtx);
+        } else if (ret_params == ETIMEDOUT) {
+            logger_.writeLine(iterations_, t_espera_us, 0, t_espera_us, periodo_us, ts_real_us, "ERROR_TIMEDLOCK_PARAMS");
+            // Continuar con parámetros anteriores (cache)
+        } else {
+            std::cerr << "ERROR HiloPID: pthread_mutex_timedlock(params) failed with code " << ret_params << std::endl;
+        }
 
         // 3. Actualizar ganancias del PID (fuera de sección crítica)
         if (pid != nullptr) {
@@ -183,10 +205,25 @@ void HiloPID::run() {
         // 4. Ejecutar PID (no necesita mutex)
         double output = system_->next(input);
         
-        // 5. Escribir acción de control (requiere mutex)
-        pthread_mutex_lock(&vars_->mtx);
-        vars_->u = output;
-        pthread_mutex_unlock(&vars_->mtx);
+        // 5. Escribir acción de control (requiere mutex con timeout de 20% período)
+        struct timespec timeout_output;
+        clock_gettime(CLOCK_MONOTONIC, &timeout_output);
+        timeout_output.tv_nsec += timeout_ns;
+        if (timeout_output.tv_nsec >= 1000000000L) {
+            timeout_output.tv_sec += timeout_output.tv_nsec / 1000000000L;
+            timeout_output.tv_nsec %= 1000000000L;
+        }
+        
+        int ret_output = pthread_mutex_timedlock(&vars_->mtx, &timeout_output);
+        if (ret_output == 0) {
+            vars_->u = output;
+            pthread_mutex_unlock(&vars_->mtx);
+        } else if (ret_output == ETIMEDOUT) {
+            logger_.writeLine(iterations_, t_espera_us, 0, t_espera_us, periodo_us, ts_real_us, "ERROR_TIMEDLOCK_OUTPUT");
+            // No escribir si timeout: control anterior se mantiene
+        } else {
+            std::cerr << "ERROR HiloPID: pthread_mutex_timedlock(output) failed with code " << ret_output << std::endl;
+        }
         
         // === FIN MEDICIÓN CICLO ===
         clock_gettime(CLOCK_MONOTONIC, &t2);

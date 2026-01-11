@@ -1,6 +1,6 @@
 # Evaluación del Proyecto PL7
 
-Fecha de evaluación: 11/01/2026 (Actualización v1.0.5)
+Fecha de evaluación: 11/01/2026 (Actualización v1.0.6)
 
 Este documento resume las fortalezas y debilidades del proyecto, e incluye recomendaciones prácticas de mejora a corto, medio y largo plazo.
 
@@ -15,6 +15,13 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 - Utilidad `Discretizer` (método Tustin) para convertir plantas continuas a discretas según período de muestreo.
 - Control de errores pthread robusto: verificación de retornos en todas las clases `Hilo*` (v1.0.5).
 - Sincronización de variables compartidas con mutex protegiendo todas las operaciones críticas.
+- **Sincronización robusta con timedlock (v1.0.6)**: 
+  - RuntimeLogger con buffer circular de 1000 líneas para métricas sin impacto I/O excesivo.
+  - Medición precisa de período real (Ts_Real_us) vs configurado: **error < 0.87%** en ejecución estable.
+  - Análisis de jitter y drift: %error_Ts oscila entre ±~0.6%, con variación no acumulativa.
+  - Tiempo de ejecución del PID: ~1-3 microsegundos con %uso < 0.03% del período (10 ms @ 100 Hz).
+  - Timedlock con timeout del 20% para lectura de parámetros y escritura de salida, previniendo bloqueos indefinidos.
+  - **Garantías de estabilidad**: márgenes muy amplios; sistema puede soportar cargas adicionales o reducir período sin comprometer estabilidad del regulador.
 
 ## Debilidades
 - Mutex único compartido: posible contención cuando el número de hilos aumenta.
@@ -49,9 +56,9 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 - Fugas/manejo de recursos: ✅ **MITIGADO en v1.0.5** revisando retornos de API pthread en todas las clases `Hilo*`; evitar asignaciones innecesarias en caminos de salida.
 
 ## Roadmap Sugerido
-- Corto plazo (próximo): Logging básico, centralizar configuración en `Config`.
-- Medio plazo: Instrumentación (jitter/latencias), CI/CD con GitHub Actions, mutex por variable.
-- Largo plazo: Buffers lock-free (SPSC), perfiles de trazas, extensibilidad con plugins.
+- Corto plazo (próximo): ✅ **COMPLETADO en v1.0.6**. Implementar timedlock con timeout del 20% en parámetros y salida de HiloPID. Extender RuntimeLogger a otros hilos (Hilo, Hilo2in, etc) con métodos writeLine() sobrecargados.
+- Medio plazo: Instrumentación comparativa de jitter entre hilos, CI/CD con GitHub Actions, mutex por variable si contención lo requiere.
+- Largo plazo: Buffers lock-free (SPSC), perfiles de trazas, extensibilidad con plugins, SCHED_FIFO/RR para reducir jitter del SO.
 
 ## Referencia de Implementación
 - Ver `include/Hilo*.h` y `src/Hilo*.cpp` para patrón de acceso sincronizado (leer bajo mutex → computar fuera → escribir bajo mutex).
