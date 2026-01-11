@@ -10,23 +10,30 @@
 #include "HiloTransmisor.h"
 #include "../include/Temporizador.h"
 #include <iostream>
-#include <stdexcept>
 #include <csignal>
 
 /**
- * @brief Constructor que crea e inicia el hilo pthread con co-propiedad shared_ptr
+ * @brief Constructor con smart pointers (recomendado)
  */
 HiloTransmisor::HiloTransmisor(std::shared_ptr<Transmisor> transmisor, 
                                std::shared_ptr<bool> running,
                                std::shared_ptr<pthread_mutex_t> mtx, 
                                double frequency)
-    : transmisor_(transmisor), running_(running), mtx_(mtx), frequency_(frequency)
+    : transmisor_(transmisor), running_(running), mtx_(mtx), frequency_(frequency),
+      transmisor_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr)
 {
-    int ret = pthread_create(&thread_, nullptr, &HiloTransmisor::threadFunc, this);
-    if (ret != 0) {
-        std::cerr << "ERROR HiloTransmisor: pthread_create failed with code " << ret << std::endl;
-        throw std::runtime_error("HiloTransmisor: Failed to create thread");
-    }
+    pthread_create(&thread_, nullptr, &HiloTransmisor::threadFunc, this);
+}
+
+/**
+ * @brief Constructor con punteros crudos (compatibilidad)
+ */
+HiloTransmisor::HiloTransmisor(Transmisor* transmisor, bool* running,
+                               pthread_mutex_t* mtx, double frequency)
+    : transmisor_(nullptr), running_(nullptr), mtx_(nullptr), frequency_(frequency),
+      transmisor_raw_(transmisor), running_raw_(running), mtx_raw_(mtx)
+{
+    pthread_create(&thread_, nullptr, &HiloTransmisor::threadFunc, this);
 }
 
 /**
@@ -34,10 +41,7 @@ HiloTransmisor::HiloTransmisor(std::shared_ptr<Transmisor> transmisor,
  */
 HiloTransmisor::~HiloTransmisor() {
     void* retVal;
-    int ret = pthread_join(thread_, &retVal);
-    if (ret != 0) {
-        std::cerr << "WARNING HiloTransmisor: pthread_join failed with code " << ret << std::endl;
-    }
+    pthread_join(thread_, &retVal);
 }
 
 /**
@@ -55,28 +59,36 @@ void* HiloTransmisor::threadFunc(void* arg) {
  * Ejecuta transmisor->enviar() periódicamente mientras *running_ sea true.
  * Lee running bajo protección mutex para evitar condiciones de carrera.
  * Usa Temporizador con temporización absoluta para eliminar drift.
- * Usa .get() para acceder a punteros crudos de shared_ptr para POSIX API.
- * 
- * @version v1.0.4+ - Migrado a shared_ptr con co-propiedad
  */
 void HiloTransmisor::run() {
     DiscreteSystems::Temporizador timer(frequency_);
 
+    // Obtener punteros
+    Transmisor* trans = transmisor_ ? transmisor_.get() : transmisor_raw_;
+    if (!trans) {
+        return;
+    }
+
     while (true) {
         bool isRunning;
-        pthread_mutex_lock(mtx_.get());
-        isRunning = *running_;
-        pthread_mutex_unlock(mtx_.get());
+        
+        if (running_) {
+            isRunning = *running_;
+        } else if (mtx_raw_) {
+            pthread_mutex_lock(mtx_raw_);
+            isRunning = *running_raw_;
+            pthread_mutex_unlock(mtx_raw_);
+        } else {
+            break;
+        }
 
         if (!isRunning)
-            break; // salir si se recibió SIGINT/SIGTERM o running es false
+            break;
 
-        // Enviar datos (transmisor ya maneja el mutex internamente)
-        if (!transmisor_->enviar()) {
+        if (!trans->enviar()) {
             std::cerr << "HiloTransmisor: Error al enviar datos" << std::endl;
         }
 
-        // Esperar hasta completar el período (temporización absoluta)
         timer.esperar();
     }
 

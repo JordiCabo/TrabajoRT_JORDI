@@ -1,39 +1,41 @@
 /**
  * @file Hilo.cpp
- * @brief Implementación del wrapper de threading para sistemas discretos con shared_ptr
+ * @brief Implementación del wrapper de threading para sistemas discretos
  * @author Jordi + GitHub Copilot
- * @date 2026-01-10
+ * @date 2025-12-18
  */
 
 #include "Hilo.h"
 #include "../include/Temporizador.h"
-#include <iostream>
-#include <stdexcept>
 
 namespace DiscreteSystems {
 
 /**
- * @brief Constructor que crea e inicia el hilo pthread e instala el manejador de señales
- * 
- * Crea un nuevo hilo pthread que ejecutará la función threadFunc,
- * iniciando la simulación del sistema a la frecuencia especificada.
- * Instala automáticamente el manejador de señales SIGINT/SIGTERM.
- * 
- * @note shared_ptr incrementa referencias; el hilo mantiene co-propiedad de todos los recursos
+ * @brief Constructor con smart pointers
  */
 Hilo::Hilo(std::shared_ptr<DiscreteSystem> system, 
            std::shared_ptr<double> input, 
            std::shared_ptr<double> output, 
-           std::shared_ptr<bool> running,
+           std::shared_ptr<std::atomic<bool>> running,
            std::shared_ptr<pthread_mutex_t> mtx, 
            double frequency)
-    : system_(system), input_(input), output_(output), mtx_(mtx), frequency_(frequency), running_(running)  
+    : system_(system), input_(input), output_(output), running_(running), mtx_(mtx), 
+      frequency_(frequency), system_raw_(nullptr), input_raw_(nullptr), output_raw_(nullptr),
+      running_raw_(nullptr), mtx_raw_(nullptr)
 {
-    int ret = pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
-    if (ret != 0) {
-        std::cerr << "ERROR Hilo: pthread_create failed with code " << ret << std::endl;
-        throw std::runtime_error("Hilo: Failed to create thread");
-    }
+    pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
+}
+
+/**
+ * @brief Constructor con punteros crudos (compatibilidad)
+ */
+Hilo::Hilo(DiscreteSystem* system, double* input, double* output, bool* running,
+           pthread_mutex_t* mtx, double frequency)
+    : system_(nullptr), input_(nullptr), output_(nullptr), running_(nullptr), mtx_(nullptr),
+      frequency_(frequency), system_raw_(system), input_raw_(input), output_raw_(output),
+      running_raw_(running), mtx_raw_(mtx)
+{
+    pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
 }
 
 /**
@@ -41,13 +43,9 @@ Hilo::Hilo(std::shared_ptr<DiscreteSystem> system,
  * 
  * Ejecuta pthread_join() para asegurar que el hilo finaliza
  * correctamente antes de destruir el objeto Hilo.
- * Decrementa referencias de shared_ptr automáticamente.
  */
 Hilo::~Hilo() {
-    int ret = pthread_join(thread_, nullptr);
-    if (ret != 0) {
-        std::cerr << "WARNING Hilo: pthread_join failed with code " << ret << std::endl;
-    }
+    pthread_join(thread_, nullptr);
 }
 
 /**
@@ -72,38 +70,53 @@ void* Hilo::threadFunc(void* arg) {
  * la variable *running_ sea true. Sincroniza entrada y salida mediante
  * el mutex para evitar condiciones de carrera.
  * 
- * Accesos a shared_ptr:
- * - mtx_.get(): obtiene puntero POSIX raw del mutex
- * - *input_, *output_, *running_: acceso dereferenciado seguro (shared_ptr valida puntero)
- * 
  * @invariant Período de ejecución = 1/frequency_ segundos
  * @invariant Acceso a *input_, *output_ y *running_ solo dentro de lock_guard
  */
 void Hilo::run() {
-    // Temporizador con retardo absoluto para evitar drift
     Temporizador timer(frequency_);
 
     while (true) {
         bool isRunning;
-        pthread_mutex_lock(mtx_.get());
-        isRunning = *running_;
-        pthread_mutex_unlock(mtx_.get());
+        
+        // Detectar interfaz y acceder a running_
+        if (running_) {
+            // Smart pointer interface
+            isRunning = running_->load();
+        } else {
+            // Raw pointer interface
+            pthread_mutex_lock(mtx_raw_);
+            isRunning = *running_raw_;
+            pthread_mutex_unlock(mtx_raw_);
+        }
 
         if (!isRunning) {
-            std::cerr << "[Hilo::run] Saliendo: isRunning=" << isRunning << std::endl;
-            break; // salir si se recibió SIGINT/SIGTERM o running_ es false
+            break;
         }
 
         double input;
-        pthread_mutex_lock(mtx_.get());
-        input = *input_;
-        pthread_mutex_unlock(mtx_.get());
+        
+        // Obtener entrada
+        if (input_) {
+            input = *input_;
+        } else {
+            pthread_mutex_lock(mtx_raw_);
+            input = *input_raw_;
+            pthread_mutex_unlock(mtx_raw_);
+        }
 
-        double y = system_->next(input);
+        // Computar
+        DiscreteSystem* sys = system_ ? system_.get() : system_raw_;
+        double y = sys->next(input);
 
-        pthread_mutex_lock(mtx_.get());
-        *output_ = y;
-        pthread_mutex_unlock(mtx_.get());
+        // Escribir salida
+        if (output_) {
+            *output_ = y;
+        } else {
+            pthread_mutex_lock(mtx_raw_);
+            *output_raw_ = y;
+            pthread_mutex_unlock(mtx_raw_);
+        }
 
         timer.esperar();
     }

@@ -10,23 +10,37 @@
 #include "HiloSwitch.h"
 #include "../include/Temporizador.h"
 #include <iostream>
-#include <stdexcept>
 #include <csignal>
 
 /**
- * @brief Constructor que crea e inicia el hilo pthread
+ * @brief Constructor con smart pointers (recomendado)
  */
-HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwitch, std::shared_ptr<double> output,
-                       std::shared_ptr<bool> running, std::shared_ptr<pthread_mutex_t> mtx, std::shared_ptr<ParametrosCompartidos> params,
+HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwitch, 
+                       std::shared_ptr<double> output,
+                       std::shared_ptr<bool> running, 
+                       std::shared_ptr<pthread_mutex_t> mtx, 
+                       std::shared_ptr<ParametrosCompartidos> params,
                        double frequency)
     : signalSwitch_(signalSwitch), output_(output), running_(running), 
-      mtx_(mtx), params_(params), frequency_(frequency)
+      mtx_(mtx), params_(params), frequency_(frequency),
+      signalSwitch_raw_(nullptr), output_raw_(nullptr), running_raw_(nullptr),
+      mtx_raw_(nullptr), params_raw_(nullptr)
 {
-    int ret = pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
-    if (ret != 0) {
-        std::cerr << "ERROR HiloSwitch: pthread_create failed with code " << ret << std::endl;
-        throw std::runtime_error("HiloSwitch: Failed to create thread");
-    }
+    pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
+}
+
+/**
+ * @brief Constructor con punteros crudos (compatibilidad)
+ */
+HiloSwitch::HiloSwitch(SignalGenerator::SignalSwitch* signalSwitch, double* output,
+                       bool* running, pthread_mutex_t* mtx, ParametrosCompartidos* params,
+                       double frequency)
+    : signalSwitch_(nullptr), output_(nullptr), running_(nullptr), 
+      mtx_(nullptr), params_(nullptr), frequency_(frequency),
+      signalSwitch_raw_(signalSwitch), output_raw_(output), running_raw_(running),
+      mtx_raw_(mtx), params_raw_(params)
+{
+    pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
 }
 
 /**
@@ -34,10 +48,7 @@ HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwit
  */
 HiloSwitch::~HiloSwitch() {
     void* retVal;
-    int ret = pthread_join(thread_, &retVal);
-    if (ret != 0) {
-        std::cerr << "WARNING HiloSwitch: pthread_join failed with code " << ret << std::endl;
-    }
+    pthread_join(thread_, &retVal);
 }
 
 /**
@@ -59,46 +70,57 @@ void* HiloSwitch::threadFunc(void* arg) {
 void HiloSwitch::run() {
     DiscreteSystems::Temporizador timer(frequency_);
 
+    // Obtener punteros a los objetos
+    SignalGenerator::SignalSwitch* sig = signalSwitch_ ? signalSwitch_.get() : signalSwitch_raw_;
+    double* out = output_ ? output_.get() : output_raw_;
+    bool* run = running_ ? running_.get() : running_raw_;
+    pthread_mutex_t* mtx = mtx_ ? mtx_.get() : mtx_raw_;
+    ParametrosCompartidos* params = params_ ? params_.get() : params_raw_;
+    
+    if (!sig || !out || !run || !mtx || !params) {
+        return;
+    }
+
     while (true) {
         bool isRunning;
-        pthread_mutex_lock(mtx_.get());
-        isRunning = *running_;
-        pthread_mutex_unlock(mtx_.get());
+        pthread_mutex_lock(mtx);
+        isRunning = *run;
+        pthread_mutex_unlock(mtx);
 
         if (!isRunning)
             break; // salir si se recibió SIGINT/SIGTERM o running es false
 
         // Leer signal_type y setpoint de parámetros compartidos
-        pthread_mutex_lock(&params_->mtx);
-        int signal_type = params_->signal_type;
-        double setpoint = params_->setpoint;
-        pthread_mutex_unlock(&params_->mtx);
+        pthread_mutex_lock(&params->mtx);
+        int signal_type = params->signal_type;
+        double setpoint = params->setpoint;
+        pthread_mutex_unlock(&params->mtx);
 
         // Actualizar selector del switch según parámetro
-        signalSwitch_->setSelector(signal_type);
+        sig->setSelector(signal_type);
         
         // Actualizar offset (setpoint) de la señal seleccionada antes de next()
         // El switch delega, así que actualizamos directamente en las señales
         // Mapeo: 0=step, 1=pwm, 2=sine
         switch (signal_type) {
             case 0:
-                signalSwitch_->getStepSignal()->offset() = setpoint;
+                sig->getStepSignal()->offset() = setpoint;
                 break;
             case 1:
-                signalSwitch_->getPwmSignal()->offset() = setpoint;
+                sig->getPwmSignal()->offset() = setpoint;
                 break;
             case 2:
-                signalSwitch_->getSineSignal()->offset() = setpoint;
+                sig->getSineSignal()->offset() = setpoint;
                 break;
         }
 
         // Ejecutar next() del switch (delega a la señal seleccionada)
-        double value = signalSwitch_->next();
+        double value = sig->next();
 
         // Escribir resultado en variable compartida
-        pthread_mutex_lock(mtx_.get());
-        *output_ = value;
-        pthread_mutex_unlock(mtx_.get());
+        pthread_mutex_lock(mtx);
+        *out = value;
+        pthread_mutex_unlock(mtx);
 
         // Esperar hasta completar el período (temporización absoluta)
         timer.esperar();

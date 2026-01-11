@@ -7,30 +7,35 @@
 
 #include "HiloSignal.h"
 #include "../include/Temporizador.h"
-#include <iostream>
-#include <stdexcept>
 #include <csignal>
 
 namespace SignalGenerator {
 
 /**
- * @brief Constructor que crea e inicia el hilo de generación de señal
- * 
- * Crea un nuevo hilo pthread que ejecutará la función threadFunc,
- * generando muestras de la señal a la frecuencia especificada.
- * 
- * @note shared_ptr incrementa referencias; el hilo mantiene co-propiedad de todos los recursos
+ * @brief Constructor con smart pointers
  */
-HiloSignal::HiloSignal(std::shared_ptr<Signal> signal, std::shared_ptr<double> output, std::shared_ptr<bool> running,
-                       std::shared_ptr<pthread_mutex_t> mtx, double frequency)
-    : signal_(signal), output_(output),
-      running_(running), mtx_(mtx), frequency_(frequency)
+HiloSignal::HiloSignal(std::shared_ptr<Signal> signal, 
+                       std::shared_ptr<double> output, 
+                       std::shared_ptr<std::atomic<bool>> running,
+                       std::shared_ptr<pthread_mutex_t> mtx, 
+                       double frequency)
+    : signal_(signal), output_(output), running_(running), mtx_(mtx), 
+      frequency_(frequency), signal_raw_(nullptr), output_raw_(nullptr),
+      running_raw_(nullptr), mtx_raw_(nullptr)
 {
-    int ret = pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
-    if (ret != 0) {
-        std::cerr << "ERROR HiloSignal: pthread_create failed with code " << ret << std::endl;
-        throw std::runtime_error("HiloSignal: Failed to create thread");
-    }
+    pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
+}
+
+/**
+ * @brief Constructor con punteros crudos (compatibilidad)
+ */
+HiloSignal::HiloSignal(Signal* signal, double* output, bool* running,
+                       pthread_mutex_t* mtx, double frequency)
+    : signal_(nullptr), output_(nullptr), running_(nullptr), mtx_(nullptr),
+      frequency_(frequency), signal_raw_(signal), output_raw_(output),
+      running_raw_(running), mtx_raw_(mtx)
+{
+    pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
 }
 
 /**
@@ -40,10 +45,7 @@ HiloSignal::HiloSignal(std::shared_ptr<Signal> signal, std::shared_ptr<double> o
  * correctamente antes de destruir el objeto HiloSignal.
  */
 HiloSignal::~HiloSignal() {
-    int ret = pthread_join(thread_, nullptr);
-    if (ret != 0) {
-        std::cerr << "WARNING HiloSignal: pthread_join failed with code " << ret << std::endl;
-    }
+    pthread_join(thread_, nullptr);
 }
 
 /**
@@ -73,25 +75,37 @@ void* HiloSignal::threadFunc(void* arg) {
  * @invariant Acceso a *output_ y *running_ solo dentro de lock_guard
  */
 void HiloSignal::run() {
-
     DiscreteSystems::Temporizador timer(frequency_);
 
     while (true) {
         bool isRunning;
-        pthread_mutex_lock(mtx_.get());
-        isRunning = *running_;
-        pthread_mutex_unlock(mtx_.get());
+        
+        // Detectar interfaz y acceder a running_
+        if (running_) {
+            // Smart pointer interface
+            isRunning = running_->load();
+        } else {
+            // Raw pointer interface
+            pthread_mutex_lock(mtx_raw_);
+            isRunning = *running_raw_;
+            pthread_mutex_unlock(mtx_raw_);
+        }
 
         if (!isRunning)
-            break; // salir si se recibió SIGINT/SIGTERM o running es false
+            break;
 
-        // Generar siguiente muestra de la señal
-        double y = signal_->next();
+        // Obtener generador de señal
+        Signal* sig = signal_ ? signal_.get() : signal_raw_;
+        double y = sig->next();
 
-        // Guardarla en la salida compartida
-        pthread_mutex_lock(mtx_.get());
-        *output_ = y;
-        pthread_mutex_unlock(mtx_.get());
+        // Guardar salida
+        if (output_) {
+            *output_ = y;
+        } else {
+            pthread_mutex_lock(mtx_raw_);
+            *output_raw_ = y;
+            pthread_mutex_unlock(mtx_raw_);
+        }
 
         timer.esperar();
     }
