@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <csignal>
 #include "SignalGenerator.h"
+#include "RuntimeLogger.h"
 
 // Variable de control global para manejo de señales
 extern volatile sig_atomic_t g_signal_run;
@@ -105,6 +106,9 @@ private:
 
     double frequency_;
     pthread_t thread_;
+    DiscreteSystems::RuntimeLogger logger_;
+    struct timespec t_prev_iteration_;
+    int iterations_;
 
     static void* threadFunc(void* arg);
     void run();

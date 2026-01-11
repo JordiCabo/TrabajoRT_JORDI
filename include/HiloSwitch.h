@@ -19,6 +19,7 @@
 #include <atomic>
 #include "SignalSwitch.h"
 #include "ParametrosCompartidos.h"
+#include "RuntimeLogger.h"
 
 // Variable de control global para manejo de señales
 extern volatile sig_atomic_t g_signal_run;
@@ -126,6 +127,9 @@ private:
     
     double frequency_;                              ///< Frecuencia de ejecución (Hz)
     pthread_t thread_;                              ///< ID del hilo pthread
+    DiscreteSystems::RuntimeLogger logger_;         ///< Logger de timing
+    struct timespec t_prev_iteration_;              ///< Timestamp anterior
+    int iterations_;                                ///< Contador de iteraciones
 
     /**
      * @brief Función estática para pthread_create

@@ -139,6 +139,24 @@ void RuntimeLogger::initializeHiloPID(double frequency) {
 }
 
 /**
+ * @brief Inicializa el logger para Hilo con columnas y header específico
+ */
+void RuntimeLogger::initializeHilo(double frequency) {
+    // Configurar header
+    std::ostringstream header;
+    header << "Hilo Runtime Performance Log\n";
+    header << "Frequency: " << frequency << " Hz\n";
+    header << "Sample Period: " << (1000000.0 / frequency) << " us";
+    setHeader(header.str());
+    
+    // Configurar columnas con anchos específicos
+    std::vector<std::string> cols = {"Iteration", "t_espera_us", "t_ejec_us", "t_total_us", "periodo_us", 
+                                     "Ts_Real_us", "drift_us", "%error_Ts", "%uso", "Status"};
+    std::vector<int> widths = {10, 14, 14, 14, 14, 14, 14, 12, 10, 12};
+    setColumns(cols, widths);
+}
+
+/**
  * @brief Escribe una línea de timing con formateo automático (versión sobrecargada)
  */
 void RuntimeLogger::writeLine(int iteration, double t_espera_us, double t_ejec_us,

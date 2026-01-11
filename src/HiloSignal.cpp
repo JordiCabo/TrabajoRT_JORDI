@@ -23,8 +23,9 @@ HiloSignal::HiloSignal(std::shared_ptr<Signal> signal,
                        double frequency)
     : signal_(signal), output_(output), running_(running), mtx_(mtx), 
       frequency_(frequency), signal_raw_(nullptr), output_raw_(nullptr),
-      running_raw_(nullptr), mtx_raw_(nullptr)
+      running_raw_(nullptr), mtx_raw_(nullptr), logger_("HiloSignal", 1000), iterations_(0)
 {
+    logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
     if (ret != 0) {
         std::cerr << "[HiloSignal] Error: pthread_create falló con código " << ret << std::endl;
@@ -39,8 +40,9 @@ HiloSignal::HiloSignal(Signal* signal, double* output, bool* running,
                        pthread_mutex_t* mtx, double frequency)
     : signal_(nullptr), output_(nullptr), running_(nullptr), mtx_(nullptr),
       frequency_(frequency), signal_raw_(signal), output_raw_(output),
-      running_raw_(running), mtx_raw_(mtx)
+      running_raw_(running), mtx_raw_(mtx), logger_("HiloSignal", 1000), iterations_(0)
 {
+    logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
     if (ret != 0) {
         std::cerr << "[HiloSignal] Error: pthread_create falló con código " << ret << std::endl;
@@ -89,8 +91,18 @@ void* HiloSignal::threadFunc(void* arg) {
  */
 void HiloSignal::run() {
     DiscreteSystems::Temporizador timer(frequency_);
+    const double periodo_us = 1000000.0 / frequency_;
+    clock_gettime(CLOCK_MONOTONIC, &t_prev_iteration_);
 
     while (true) {
+        iterations_++;
+        struct timespec t0;
+        clock_gettime(CLOCK_MONOTONIC, &t0);
+        
+        double ts_real_us = (t0.tv_sec - t_prev_iteration_.tv_sec) * 1000000.0 +
+                            (t0.tv_nsec - t_prev_iteration_.tv_nsec) / 1000.0;
+        t_prev_iteration_ = t0;
+
         bool isRunning;
         
         pthread_mutex_lock(mtx_ ? mtx_.get() : mtx_raw_);
@@ -100,9 +112,17 @@ void HiloSignal::run() {
         if (!isRunning)
             break;
 
+        struct timespec t1;
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+
         // Obtener generador de señal
         Signal* sig = signal_ ? signal_.get() : signal_raw_;
         double y = sig->next();
+
+        struct timespec t2;
+        clock_gettime(CLOCK_MONOTONIC, &t2);
+        double t_ejecucion_us = (t2.tv_sec - t1.tv_sec) * 1000000.0 + 
+                                (t2.tv_nsec - t1.tv_nsec) / 1000.0;
 
         // Guardar salida
         if (output_) {
@@ -112,6 +132,22 @@ void HiloSignal::run() {
             *output_raw_ = y;
             pthread_mutex_unlock(mtx_raw_);
         }
+
+        struct timespec t3;
+        clock_gettime(CLOCK_MONOTONIC, &t3);
+        double t_total_us = (t3.tv_sec - t0.tv_sec) * 1000000.0 + 
+                            (t3.tv_nsec - t0.tv_nsec) / 1000.0;
+
+        const char* status;
+        if (t_total_us > periodo_us) {
+            status = "CRITICAL";
+        } else if (t_total_us > 0.9 * periodo_us) {
+            status = "WARNING";
+        } else {
+            status = "OK";
+        }
+
+        logger_.writeLine(iterations_, 0, t_ejecucion_us, t_total_us, periodo_us, ts_real_us, status);
 
         timer.esperar();
     }

@@ -17,6 +17,7 @@
 #include <atomic>
 #include <csignal>
 #include "DiscreteSystem.h"
+#include "RuntimeLogger.h"
 
 // Variable de control global para manejo de señales
 extern volatile sig_atomic_t g_signal_run;
@@ -113,6 +114,9 @@ private:
 
     double frequency_;          ///< Frecuencia de ejecución en Hz
     pthread_t thread_;          ///< Identificador del hilo pthread
+    RuntimeLogger logger_;      ///< Logger de timing
+    struct timespec t_prev_iteration_;  ///< Timestamp anterior para cálculo de Ts_Real
+    int iterations_;            ///< Contador de iteraciones
 
     /**
      * @brief Función estática de punto de entrada del hilo

@@ -116,7 +116,14 @@ public:
      * 
      * @param frequency Frecuencia de ejecución en Hz
      */
-    void initializeHiloPID(double frequency);    
+    void initializeHiloPID(double frequency);
+    
+    /**
+     * @brief Inicializa RuntimeLogger para Hilo con columnas y header específico
+     * 
+     * @param frequency Frecuencia de ejecución en Hz
+     */
+    void initializeHilo(double frequency);    
     /**
      * @brief Escribe una línea de timing (versión sobrecargada)
      * 

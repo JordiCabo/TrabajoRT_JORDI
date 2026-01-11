@@ -26,8 +26,10 @@ Hilo2in::Hilo2in(std::shared_ptr<DiscreteSystem> system,
     : system_(system), input1_(input1), input2_(input2), output_(output),
       running_(running), mtx_(mtx), frequency_(frequency),
       system_raw_(nullptr), input1_raw_(nullptr), input2_raw_(nullptr),
-      output_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr)
+      output_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr),
+      logger_("Hilo2in", 1000), iterations_(0)
 {
+    logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &Hilo2in::threadFunc, this);
     if (ret != 0) {
         std::cerr << "[Hilo2in] Error: pthread_create falló con código " << ret << std::endl;
@@ -43,8 +45,10 @@ Hilo2in::Hilo2in(DiscreteSystem* system, double* input1, double* input2, double*
     : system_(nullptr), input1_(nullptr), input2_(nullptr), output_(nullptr),
       running_(nullptr), mtx_(nullptr), frequency_(frequency),
       system_raw_(system), input1_raw_(input1), input2_raw_(input2),
-      output_raw_(output), running_raw_(running), mtx_raw_(mtx)
+      output_raw_(output), running_raw_(running), mtx_raw_(mtx),
+      logger_("Hilo2in", 1000), iterations_(0)
 {
+    logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &Hilo2in::threadFunc, this);
     if (ret != 0) {
         std::cerr << "[Hilo2in] Error: pthread_create falló con código " << ret << std::endl;
@@ -105,7 +109,18 @@ void Hilo2in::run() {
         return;
     }
 
+    const double periodo_us = 1000000.0 / frequency_;
+    clock_gettime(CLOCK_MONOTONIC, &t_prev_iteration_);
+
     while (true) {
+        iterations_++;
+        struct timespec t0;
+        clock_gettime(CLOCK_MONOTONIC, &t0);
+        
+        double ts_real_us = (t0.tv_sec - t_prev_iteration_.tv_sec) * 1000000.0 +
+                            (t0.tv_nsec - t_prev_iteration_.tv_nsec) / 1000.0;
+        t_prev_iteration_ = t0;
+
         bool isRunning;
         pthread_mutex_lock(mtx);
         isRunning = running_ ? *running_ : *running_raw_;
@@ -115,16 +130,44 @@ void Hilo2in::run() {
             break; // salir si se recibió SIGINT/SIGTERM o running_ es false
 
         double in1_val, in2_val;
+        struct timespec t1;
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        
         pthread_mutex_lock(mtx);
         in1_val = *in1;
         in2_val = *in2;
         pthread_mutex_unlock(mtx);
 
+        struct timespec t2;
+        clock_gettime(CLOCK_MONOTONIC, &t2);
+        double t_ejecucion_us;
+
         double y = sys->next(in1_val, in2_val);
+
+        struct timespec t3;
+        clock_gettime(CLOCK_MONOTONIC, &t3);
+        t_ejecucion_us = (t3.tv_sec - t2.tv_sec) * 1000000.0 + 
+                         (t3.tv_nsec - t2.tv_nsec) / 1000.0;
 
         pthread_mutex_lock(mtx);
         *out = y;
         pthread_mutex_unlock(mtx);
+
+        struct timespec t4;
+        clock_gettime(CLOCK_MONOTONIC, &t4);
+        double t_total_us = (t4.tv_sec - t0.tv_sec) * 1000000.0 + 
+                            (t4.tv_nsec - t0.tv_nsec) / 1000.0;
+
+        const char* status;
+        if (t_total_us > periodo_us) {
+            status = "CRITICAL";
+        } else if (t_total_us > 0.9 * periodo_us) {
+            status = "WARNING";
+        } else {
+            status = "OK";
+        }
+
+        logger_.writeLine(iterations_, 0, t_ejecucion_us, t_total_us, periodo_us, ts_real_us, status);
 
         timer.esperar();
     }

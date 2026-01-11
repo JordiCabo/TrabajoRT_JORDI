@@ -18,6 +18,7 @@
 #include <memory>
 #include <atomic>
 #include "Transmisor.h"
+#include "RuntimeLogger.h"
 
 // Variable de control global para manejo de señales
 extern volatile sig_atomic_t g_signal_run;
@@ -132,6 +133,9 @@ private:
     
     double frequency_;              ///< Frecuencia de envío (Hz)
     pthread_t thread_;              ///< ID del hilo pthread
+    DiscreteSystems::RuntimeLogger logger_;  ///< Logger de timing
+    struct timespec t_prev_iteration_;       ///< Timestamp anterior
+    int iterations_;                         ///< Contador de iteraciones
 };
 
 #endif // HILO_TRANSMISOR_H

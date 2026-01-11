@@ -4,6 +4,7 @@
 #include <memory>
 #include <atomic>
 #include "InterruptorArranque.h"
+#include "RuntimeLogger.h"
 
 class HiloIntArranque {
 private:
@@ -19,6 +20,9 @@ private:
     
     pthread_t thread_;
     double frequency_;
+    DiscreteSystems::RuntimeLogger logger_;
+    struct timespec t_prev_iteration_;
+    int iterations_;
     
     void run();
     static void* threadFunc(void* arg);

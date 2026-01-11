@@ -25,8 +25,9 @@ HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwit
     : signalSwitch_(signalSwitch), output_(output), running_(running), 
       mtx_(mtx), params_(params), frequency_(frequency),
       signalSwitch_raw_(nullptr), output_raw_(nullptr), running_raw_(nullptr),
-      mtx_raw_(nullptr), params_raw_(nullptr)
+      mtx_raw_(nullptr), params_raw_(nullptr), logger_("HiloSwitch", 1000), iterations_(0)
 {
+    logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
     if (ret != 0) {
         std::cerr << "[HiloSwitch] Error: pthread_create falló con código " << ret << std::endl;
@@ -43,8 +44,9 @@ HiloSwitch::HiloSwitch(SignalGenerator::SignalSwitch* signalSwitch, double* outp
     : signalSwitch_(nullptr), output_(nullptr), running_(nullptr), 
       mtx_(nullptr), params_(nullptr), frequency_(frequency),
       signalSwitch_raw_(signalSwitch), output_raw_(output), running_raw_(running),
-      mtx_raw_(mtx), params_raw_(params)
+      mtx_raw_(mtx), params_raw_(params), logger_("HiloSwitch", 1000), iterations_(0)
 {
+    logger_.initializeHilo(frequency);
     int ret = pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
     if (ret != 0) {
         std::cerr << "[HiloSwitch] Error: pthread_create falló con código " << ret << std::endl;
@@ -81,6 +83,8 @@ void* HiloSwitch::threadFunc(void* arg) {
  */
 void HiloSwitch::run() {
     DiscreteSystems::Temporizador timer(frequency_);
+    const double periodo_us = 1000000.0 / frequency_;
+    clock_gettime(CLOCK_MONOTONIC, &t_prev_iteration_);
 
     // Obtener punteros a los objetos
     SignalGenerator::SignalSwitch* sig = signalSwitch_ ? signalSwitch_.get() : signalSwitch_raw_;
@@ -93,6 +97,14 @@ void HiloSwitch::run() {
     }
 
     while (true) {
+        iterations_++;
+        struct timespec t0;
+        clock_gettime(CLOCK_MONOTONIC, &t0);
+        
+        double ts_real_us = (t0.tv_sec - t_prev_iteration_.tv_sec) * 1000000.0 +
+                            (t0.tv_nsec - t_prev_iteration_.tv_nsec) / 1000.0;
+        t_prev_iteration_ = t0;
+
         bool isRunning;
         pthread_mutex_lock(mtx);
         isRunning = running_ ? *running_ : *running_raw_;
@@ -100,6 +112,9 @@ void HiloSwitch::run() {
 
         if (!isRunning)
             break; // salir si se recibió SIGINT/SIGTERM o running es false
+
+        struct timespec t1;
+        clock_gettime(CLOCK_MONOTONIC, &t1);
 
         // Leer signal_type y setpoint de parámetros compartidos
         pthread_mutex_lock(&params->mtx);
@@ -125,13 +140,38 @@ void HiloSwitch::run() {
                 break;
         }
 
+        struct timespec t2;
+        clock_gettime(CLOCK_MONOTONIC, &t2);
+        double t_ejecucion_us;
+
         // Ejecutar next() del switch (delega a la señal seleccionada)
         double value = sig->next();
+
+        struct timespec t3;
+        clock_gettime(CLOCK_MONOTONIC, &t3);
+        t_ejecucion_us = (t3.tv_sec - t2.tv_sec) * 1000000.0 + 
+                         (t3.tv_nsec - t2.tv_nsec) / 1000.0;
 
         // Escribir resultado en variable compartida
         pthread_mutex_lock(mtx);
         *out = value;
         pthread_mutex_unlock(mtx);
+
+        struct timespec t4;
+        clock_gettime(CLOCK_MONOTONIC, &t4);
+        double t_total_us = (t4.tv_sec - t0.tv_sec) * 1000000.0 + 
+                            (t4.tv_nsec - t0.tv_nsec) / 1000.0;
+
+        const char* status;
+        if (t_total_us > periodo_us) {
+            status = "CRITICAL";
+        } else if (t_total_us > 0.9 * periodo_us) {
+            status = "WARNING";
+        } else {
+            status = "OK";
+        }
+
+        logger_.writeLine(iterations_, 0, t_ejecucion_us, t_total_us, periodo_us, ts_real_us, status);
 
         // Esperar hasta completar el período (temporización absoluta)
         timer.esperar();
