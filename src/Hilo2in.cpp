@@ -8,6 +8,8 @@
 #include "Hilo2in.h"
 #include "../include/Temporizador.h"
 #include <csignal>
+#include <iostream>
+#include <stdexcept>
 
 namespace DiscreteSystems {
 
@@ -18,7 +20,7 @@ Hilo2in::Hilo2in(std::shared_ptr<DiscreteSystem> system,
                  std::shared_ptr<double> input1, 
                  std::shared_ptr<double> input2, 
                  std::shared_ptr<double> output, 
-                 std::shared_ptr<bool> running, 
+                 bool* running,
                  std::shared_ptr<pthread_mutex_t> mtx, 
                  double frequency)
     : system_(system), input1_(input1), input2_(input2), output_(output),
@@ -26,7 +28,11 @@ Hilo2in::Hilo2in(std::shared_ptr<DiscreteSystem> system,
       system_raw_(nullptr), input1_raw_(nullptr), input2_raw_(nullptr),
       output_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr)
 {
-    pthread_create(&thread_, nullptr, &Hilo2in::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &Hilo2in::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[Hilo2in] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("Hilo2in - pthread_create falló");
+    }
 }
 
 /**
@@ -39,7 +45,11 @@ Hilo2in::Hilo2in(DiscreteSystem* system, double* input1, double* input2, double*
       system_raw_(system), input1_raw_(input1), input2_raw_(input2),
       output_raw_(output), running_raw_(running), mtx_raw_(mtx)
 {
-    pthread_create(&thread_, nullptr, &Hilo2in::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &Hilo2in::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[Hilo2in] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("Hilo2in - pthread_create falló");
+    }
 }
 
 /**
@@ -49,7 +59,10 @@ Hilo2in::Hilo2in(DiscreteSystem* system, double* input1, double* input2, double*
  * correctamente antes de destruir el objeto Hilo2in.
  */
 Hilo2in::~Hilo2in() {
-    pthread_join(thread_, nullptr);
+    int ret = pthread_join(thread_, nullptr);
+    if (ret != 0) {
+        std::cerr << "[Hilo2in] Error: pthread_join falló con código " << ret << std::endl;
+    }
 }
 
 /**
@@ -86,17 +99,16 @@ void Hilo2in::run() {
     double* in1 = input1_ ? input1_.get() : input1_raw_;
     double* in2 = input2_ ? input2_.get() : input2_raw_;
     double* out = output_ ? output_.get() : output_raw_;
-    bool* run = running_ ? running_.get() : running_raw_;
     pthread_mutex_t* mtx = mtx_ ? mtx_.get() : mtx_raw_;
     
-    if (!sys || !in1 || !in2 || !out || !run || !mtx) {
+    if (!sys || !in1 || !in2 || !out || !mtx) {
         return;
     }
 
     while (true) {
         bool isRunning;
         pthread_mutex_lock(mtx);
-        isRunning = *run;
+        isRunning = running_ ? *running_ : *running_raw_;
         pthread_mutex_unlock(mtx);
 
         if (!isRunning)

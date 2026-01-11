@@ -77,7 +77,7 @@ public:
      * @param frequency Frecuencia de envío en Hz
      */
     HiloTransmisor(std::shared_ptr<Transmisor> transmisor, 
-                   std::shared_ptr<bool> running, 
+                   bool* running,
                    std::shared_ptr<pthread_mutex_t> mtx, 
                    double frequency);
     
@@ -122,7 +122,7 @@ private:
 
     // Smart pointers
     std::shared_ptr<Transmisor> transmisor_;
-    std::shared_ptr<bool> running_;
+    bool* running_;
     std::shared_ptr<pthread_mutex_t> mtx_;
     
     // Raw pointers (compatibilidad)

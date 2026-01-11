@@ -71,7 +71,7 @@ public:
      * @param frequency Frecuencia de recepción en Hz
      */
     HiloReceptor(std::shared_ptr<Receptor> receptor, 
-                 std::shared_ptr<bool> running, 
+                 bool* running,
                  std::shared_ptr<pthread_mutex_t> mtx, 
                  double frequency);
     
@@ -116,7 +116,7 @@ private:
 
     // Smart pointers
     std::shared_ptr<Receptor> receptor_;
-    std::shared_ptr<bool> running_;
+    bool* running_;
     std::shared_ptr<pthread_mutex_t> mtx_;
     
     // Raw pointers (compatibilidad)

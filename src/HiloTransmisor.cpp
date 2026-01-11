@@ -11,18 +11,23 @@
 #include "../include/Temporizador.h"
 #include <iostream>
 #include <csignal>
+#include <stdexcept>
 
 /**
  * @brief Constructor con smart pointers (recomendado)
  */
 HiloTransmisor::HiloTransmisor(std::shared_ptr<Transmisor> transmisor, 
-                               std::shared_ptr<bool> running,
+                               bool* running,
                                std::shared_ptr<pthread_mutex_t> mtx, 
                                double frequency)
     : transmisor_(transmisor), running_(running), mtx_(mtx), frequency_(frequency),
       transmisor_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr)
 {
-    pthread_create(&thread_, nullptr, &HiloTransmisor::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloTransmisor::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[HiloTransmisor] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("HiloTransmisor - pthread_create falló");
+    }
 }
 
 /**
@@ -33,7 +38,11 @@ HiloTransmisor::HiloTransmisor(Transmisor* transmisor, bool* running,
     : transmisor_(nullptr), running_(nullptr), mtx_(nullptr), frequency_(frequency),
       transmisor_raw_(transmisor), running_raw_(running), mtx_raw_(mtx)
 {
-    pthread_create(&thread_, nullptr, &HiloTransmisor::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloTransmisor::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[HiloTransmisor] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("HiloTransmisor - pthread_create falló");
+    }
 }
 
 /**
@@ -41,7 +50,10 @@ HiloTransmisor::HiloTransmisor(Transmisor* transmisor, bool* running,
  */
 HiloTransmisor::~HiloTransmisor() {
     void* retVal;
-    pthread_join(thread_, &retVal);
+    int ret = pthread_join(thread_, &retVal);
+    if (ret != 0) {
+        std::cerr << "[HiloTransmisor] Error: pthread_join falló con código " << ret << std::endl;
+    }
 }
 
 /**
@@ -72,13 +84,11 @@ void HiloTransmisor::run() {
     while (true) {
         bool isRunning;
         
-        if (running_) {
-            isRunning = *running_;
-        } else if (mtx_raw_) {
-            pthread_mutex_lock(mtx_raw_);
-            isRunning = *running_raw_;
-            pthread_mutex_unlock(mtx_raw_);
-        } else {
+        pthread_mutex_lock(mtx_ ? mtx_.get() : mtx_raw_);
+        isRunning = running_ ? *running_ : *running_raw_;
+        pthread_mutex_unlock(mtx_ ? mtx_.get() : mtx_raw_);
+
+        if (!isRunning) {
             break;
         }
 

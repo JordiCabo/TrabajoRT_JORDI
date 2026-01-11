@@ -9,7 +9,7 @@ class HiloIntArranque {
 private:
     // Smart pointers
     std::shared_ptr<InterruptorArranque> interruptor_;
-    std::shared_ptr<std::atomic<bool>> running_;
+    bool* running_;
     std::shared_ptr<pthread_mutex_t> mtx_;
     
     // Raw pointers (compatibilidad)
@@ -28,7 +28,7 @@ public:
      * @brief Constructor con smart pointers (recomendado)
      */
     HiloIntArranque(std::shared_ptr<InterruptorArranque> interruptor, 
-                    std::shared_ptr<std::atomic<bool>> running, 
+                    bool* running,
                     std::shared_ptr<pthread_mutex_t> mtx, 
                     double frequency = 10.0);
     

@@ -16,14 +16,18 @@ namespace DiscreteSystems {
 Hilo::Hilo(std::shared_ptr<DiscreteSystem> system, 
            std::shared_ptr<double> input, 
            std::shared_ptr<double> output, 
-           std::shared_ptr<std::atomic<bool>> running,
+           bool* running,
            std::shared_ptr<pthread_mutex_t> mtx, 
            double frequency)
     : system_(system), input_(input), output_(output), running_(running), mtx_(mtx), 
       frequency_(frequency), system_raw_(nullptr), input_raw_(nullptr), output_raw_(nullptr),
       running_raw_(nullptr), mtx_raw_(nullptr)
 {
-    pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[Hilo::Hilo] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("Hilo::Hilo - pthread_create falló");
+    }
 }
 
 /**
@@ -35,7 +39,11 @@ Hilo::Hilo(DiscreteSystem* system, double* input, double* output, bool* running,
       frequency_(frequency), system_raw_(system), input_raw_(input), output_raw_(output),
       running_raw_(running), mtx_raw_(mtx)
 {
-    pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &Hilo::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[Hilo::Hilo] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("Hilo::Hilo - pthread_create falló");
+    }
 }
 
 /**
@@ -45,7 +53,10 @@ Hilo::Hilo(DiscreteSystem* system, double* input, double* output, bool* running,
  * correctamente antes de destruir el objeto Hilo.
  */
 Hilo::~Hilo() {
-    pthread_join(thread_, nullptr);
+    int ret = pthread_join(thread_, nullptr);
+    if (ret != 0) {
+        std::cerr << "[Hilo::~Hilo] Error: pthread_join falló con código " << ret << std::endl;
+    }
 }
 
 /**
@@ -79,16 +90,9 @@ void Hilo::run() {
     while (true) {
         bool isRunning;
         
-        // Detectar interfaz y acceder a running_
-        if (running_) {
-            // Smart pointer interface
-            isRunning = running_->load();
-        } else {
-            // Raw pointer interface
-            pthread_mutex_lock(mtx_raw_);
-            isRunning = *running_raw_;
-            pthread_mutex_unlock(mtx_raw_);
-        }
+        pthread_mutex_lock(mtx_ ? mtx_.get() : mtx_raw_);
+        isRunning = running_ ? *running_ : *running_raw_;
+        pthread_mutex_unlock(mtx_ ? mtx_.get() : mtx_raw_);
 
         if (!isRunning) {
             break;

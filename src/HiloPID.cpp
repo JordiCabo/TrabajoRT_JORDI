@@ -14,27 +14,17 @@
 namespace DiscreteSystems {
 
 /**
- * @brief Constructor con smart pointers
- */
-HiloPID::HiloPID(std::shared_ptr<DiscreteSystem> pid, 
-                 std::shared_ptr<VariablesCompartidas> vars,
-                 std::shared_ptr<ParametrosCompartidos> params, 
-                 double frequency)
-    : system_(pid), vars_(vars), params_(params), frequency_(frequency),
-      system_raw_(nullptr), vars_raw_(nullptr), params_raw_(nullptr)
-{
-    pthread_create(&thread_, nullptr, &HiloPID::threadFunc, this);
-}
-
-/**
- * @brief Constructor con punteros crudos (compatibilidad)
+ * @brief Constructor
  */
 HiloPID::HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars, 
                  ParametrosCompartidos* params, double frequency)
-    : system_(nullptr), vars_(nullptr), params_(nullptr), frequency_(frequency),
-      system_raw_(pid), vars_raw_(vars), params_raw_(params)
+    : system_(pid), vars_(vars), params_(params), frequency_(frequency)
 {
-    pthread_create(&thread_, nullptr, &HiloPID::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloPID::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[HiloPID] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("HiloPID - pthread_create falló");
+    }
 }
 
 /**
@@ -44,7 +34,10 @@ HiloPID::HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars,
  * correctamente antes de destruir el objeto HiloPID.
  */
 HiloPID::~HiloPID() {
-    pthread_join(thread_, nullptr);
+    int ret = pthread_join(thread_, nullptr);
+    if (ret != 0) {
+        std::cerr << "[HiloPID] Error: pthread_join falló con código " << ret << std::endl;
+    }
 }
 
 /**
@@ -77,32 +70,27 @@ void* HiloPID::threadFunc(void* arg) {
  */
 void HiloPID::run() {
     Temporizador timer(frequency_);
-
-    // Obtener punteros a los objetos
-    DiscreteSystem* sys = system_ ? system_.get() : system_raw_;
-    VariablesCompartidas* vars = vars_ ? vars_.get() : vars_raw_;
-    ParametrosCompartidos* params = params_ ? params_.get() : params_raw_;
     
-    if (!sys || !vars || !params) {
+    if (!system_ || !vars_ || !params_) {
         return;
     }
     
-    PIDController* pid = dynamic_cast<PIDController*>(sys);
+    PIDController* pid = dynamic_cast<PIDController*>(system_);
     
     while (true) {
-        pthread_mutex_lock(&vars->mtx);
-        bool running = vars->running;
-        pthread_mutex_unlock(&vars->mtx);
+        pthread_mutex_lock(&vars_->mtx);
+        bool running = vars_->running;
+        pthread_mutex_unlock(&vars_->mtx);
         
         if (!running)
             break;
 
         // Leer parámetros dinámicos
-        pthread_mutex_lock(&params->mtx);
-        double kp = params->kp;
-        double ki = params->ki;
-        double kd = params->kd;
-        pthread_mutex_unlock(&params->mtx);
+        pthread_mutex_lock(&params_->mtx);
+        double kp = params_->kp;
+        double ki = params_->ki;
+        double kd = params_->kd;
+        pthread_mutex_unlock(&params_->mtx);
 
         // Actualizar ganancias del PID
         if (pid != nullptr) {
@@ -110,11 +98,11 @@ void HiloPID::run() {
         }
 
         // Leer entrada, ejecutar PID, escribir salida
-        pthread_mutex_lock(&vars->mtx);
-        double input = vars->e;
-        double output = sys->next(input);
-        vars->u = output;
-        pthread_mutex_unlock(&vars->mtx);
+        pthread_mutex_lock(&vars_->mtx);
+        double input = vars_->e;
+        double output = system_->next(input);
+        vars_->u = output;
+        pthread_mutex_unlock(&vars_->mtx);
 
         timer.esperar();
     }

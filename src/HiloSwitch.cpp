@@ -11,13 +11,14 @@
 #include "../include/Temporizador.h"
 #include <iostream>
 #include <csignal>
+#include <stdexcept>
 
 /**
  * @brief Constructor con smart pointers (recomendado)
  */
 HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwitch, 
                        std::shared_ptr<double> output,
-                       std::shared_ptr<bool> running, 
+                       bool* running,
                        std::shared_ptr<pthread_mutex_t> mtx, 
                        std::shared_ptr<ParametrosCompartidos> params,
                        double frequency)
@@ -26,7 +27,11 @@ HiloSwitch::HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwit
       signalSwitch_raw_(nullptr), output_raw_(nullptr), running_raw_(nullptr),
       mtx_raw_(nullptr), params_raw_(nullptr)
 {
-    pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[HiloSwitch] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("HiloSwitch - pthread_create falló");
+    }
 }
 
 /**
@@ -40,7 +45,11 @@ HiloSwitch::HiloSwitch(SignalGenerator::SignalSwitch* signalSwitch, double* outp
       signalSwitch_raw_(signalSwitch), output_raw_(output), running_raw_(running),
       mtx_raw_(mtx), params_raw_(params)
 {
-    pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloSwitch::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[HiloSwitch] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("HiloSwitch - pthread_create falló");
+    }
 }
 
 /**
@@ -48,7 +57,10 @@ HiloSwitch::HiloSwitch(SignalGenerator::SignalSwitch* signalSwitch, double* outp
  */
 HiloSwitch::~HiloSwitch() {
     void* retVal;
-    pthread_join(thread_, &retVal);
+    int ret = pthread_join(thread_, &retVal);
+    if (ret != 0) {
+        std::cerr << "[HiloSwitch] Error: pthread_join falló con código " << ret << std::endl;
+    }
 }
 
 /**
@@ -73,18 +85,17 @@ void HiloSwitch::run() {
     // Obtener punteros a los objetos
     SignalGenerator::SignalSwitch* sig = signalSwitch_ ? signalSwitch_.get() : signalSwitch_raw_;
     double* out = output_ ? output_.get() : output_raw_;
-    bool* run = running_ ? running_.get() : running_raw_;
     pthread_mutex_t* mtx = mtx_ ? mtx_.get() : mtx_raw_;
     ParametrosCompartidos* params = params_ ? params_.get() : params_raw_;
     
-    if (!sig || !out || !run || !mtx || !params) {
+    if (!sig || !out || !mtx || !params) {
         return;
     }
 
     while (true) {
         bool isRunning;
         pthread_mutex_lock(mtx);
-        isRunning = *run;
+        isRunning = running_ ? *running_ : *running_raw_;
         pthread_mutex_unlock(mtx);
 
         if (!isRunning)

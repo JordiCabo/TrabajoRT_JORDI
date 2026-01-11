@@ -8,6 +8,8 @@
 #include "HiloSignal.h"
 #include "../include/Temporizador.h"
 #include <csignal>
+#include <iostream>
+#include <stdexcept>
 
 namespace SignalGenerator {
 
@@ -15,15 +17,19 @@ namespace SignalGenerator {
  * @brief Constructor con smart pointers
  */
 HiloSignal::HiloSignal(std::shared_ptr<Signal> signal, 
-                       std::shared_ptr<double> output, 
-                       std::shared_ptr<std::atomic<bool>> running,
+                       std::shared_ptr<double> output,
+                       bool* running,
                        std::shared_ptr<pthread_mutex_t> mtx, 
                        double frequency)
     : signal_(signal), output_(output), running_(running), mtx_(mtx), 
       frequency_(frequency), signal_raw_(nullptr), output_raw_(nullptr),
       running_raw_(nullptr), mtx_raw_(nullptr)
 {
-    pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[HiloSignal] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("HiloSignal - pthread_create falló");
+    }
 }
 
 /**
@@ -35,7 +41,11 @@ HiloSignal::HiloSignal(Signal* signal, double* output, bool* running,
       frequency_(frequency), signal_raw_(signal), output_raw_(output),
       running_raw_(running), mtx_raw_(mtx)
 {
-    pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloSignal::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[HiloSignal] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("HiloSignal - pthread_create falló");
+    }
 }
 
 /**
@@ -45,7 +55,10 @@ HiloSignal::HiloSignal(Signal* signal, double* output, bool* running,
  * correctamente antes de destruir el objeto HiloSignal.
  */
 HiloSignal::~HiloSignal() {
-    pthread_join(thread_, nullptr);
+    int ret = pthread_join(thread_, nullptr);
+    if (ret != 0) {
+        std::cerr << "[HiloSignal] Error: pthread_join falló con código " << ret << std::endl;
+    }
 }
 
 /**
@@ -80,16 +93,9 @@ void HiloSignal::run() {
     while (true) {
         bool isRunning;
         
-        // Detectar interfaz y acceder a running_
-        if (running_) {
-            // Smart pointer interface
-            isRunning = running_->load();
-        } else {
-            // Raw pointer interface
-            pthread_mutex_lock(mtx_raw_);
-            isRunning = *running_raw_;
-            pthread_mutex_unlock(mtx_raw_);
-        }
+        pthread_mutex_lock(mtx_ ? mtx_.get() : mtx_raw_);
+        isRunning = running_ ? *running_ : *running_raw_;
+        pthread_mutex_unlock(mtx_ ? mtx_.get() : mtx_raw_);
 
         if (!isRunning)
             break;

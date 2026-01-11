@@ -55,16 +55,7 @@ namespace DiscreteSystems {
 class HiloPID {
 public:
     /**
-     * @brief Constructor con smart pointers (recomendado)
-     */
-    HiloPID(std::shared_ptr<DiscreteSystem> pid, 
-            std::shared_ptr<VariablesCompartidas> vars,
-            std::shared_ptr<ParametrosCompartidos> params, 
-            double frequency=100);
-
-    /**
-     * @brief Constructor con punteros crudos (compatibilidad)
-     * @deprecated Usar constructor con smart pointers
+     * @brief Constructor
      */
     HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars, 
             ParametrosCompartidos* params, double frequency=100);
@@ -74,15 +65,9 @@ public:
     ~HiloPID();
 
 private:
-    // Smart pointers
-    std::shared_ptr<DiscreteSystem> system_;
-    std::shared_ptr<VariablesCompartidas> vars_;
-    std::shared_ptr<ParametrosCompartidos> params_;
-    
-    // Raw pointers (compatibilidad)
-    DiscreteSystem* system_raw_;
-    VariablesCompartidas* vars_raw_;
-    ParametrosCompartidos* params_raw_;
+    DiscreteSystem* system_;
+    VariablesCompartidas* vars_;
+    ParametrosCompartidos* params_;
 
     double frequency_;
     pthread_t thread_;

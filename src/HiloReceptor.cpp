@@ -11,18 +11,23 @@
 #include "../include/Temporizador.h"
 #include <iostream>
 #include <csignal>
+#include <stdexcept>
 
 /**
  * @brief Constructor con smart pointers (recomendado)
  */
 HiloReceptor::HiloReceptor(std::shared_ptr<Receptor> receptor, 
-                           std::shared_ptr<bool> running,
+                           bool* running,
                            std::shared_ptr<pthread_mutex_t> mtx, 
                            double frequency)
     : receptor_(receptor), running_(running), mtx_(mtx), frequency_(frequency),
       receptor_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr)
 {
-    pthread_create(&thread_, nullptr, &HiloReceptor::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloReceptor::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[HiloReceptor] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("HiloReceptor - pthread_create falló");
+    }
 }
 
 /**
@@ -33,7 +38,11 @@ HiloReceptor::HiloReceptor(Receptor* receptor, bool* running,
     : receptor_(nullptr), running_(nullptr), mtx_(nullptr), frequency_(frequency),
       receptor_raw_(receptor), running_raw_(running), mtx_raw_(mtx)
 {
-    pthread_create(&thread_, nullptr, &HiloReceptor::threadFunc, this);
+    int ret = pthread_create(&thread_, nullptr, &HiloReceptor::threadFunc, this);
+    if (ret != 0) {
+        std::cerr << "[HiloReceptor] Error: pthread_create falló con código " << ret << std::endl;
+        throw std::runtime_error("HiloReceptor - pthread_create falló");
+    }
 }
 
 /**
@@ -41,7 +50,10 @@ HiloReceptor::HiloReceptor(Receptor* receptor, bool* running,
  */
 HiloReceptor::~HiloReceptor() {
     void* retVal;
-    pthread_join(thread_, &retVal);
+    int ret = pthread_join(thread_, &retVal);
+    if (ret != 0) {
+        std::cerr << "[HiloReceptor] Error: pthread_join falló con código " << ret << std::endl;
+    }
 }
 
 /**
@@ -65,17 +77,16 @@ void HiloReceptor::run() {
 
     // Obtener punteros a los objetos
     Receptor* rx = receptor_ ? receptor_.get() : receptor_raw_;
-    bool* run = running_ ? running_.get() : running_raw_;
     pthread_mutex_t* mtx = mtx_ ? mtx_.get() : mtx_raw_;
     
-    if (!rx || !run || !mtx) {
+    if (!rx || !mtx) {
         return;
     }
 
     while (true) {
         bool isRunning;
         pthread_mutex_lock(mtx);
-        isRunning = *run;
+        isRunning = running_ ? *running_ : *running_raw_;
         pthread_mutex_unlock(mtx);
 
         if (!isRunning)

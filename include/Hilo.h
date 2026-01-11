@@ -78,7 +78,7 @@ public:
     Hilo(std::shared_ptr<DiscreteSystem> system, 
          std::shared_ptr<double> input, 
          std::shared_ptr<double> output, 
-         std::shared_ptr<std::atomic<bool>> running,
+         bool* running,
          std::shared_ptr<pthread_mutex_t> mtx, 
          double frequency=100);
 
@@ -112,7 +112,7 @@ private:
     std::shared_ptr<DiscreteSystem> system_;
     std::shared_ptr<double> input_;
     std::shared_ptr<double> output_;
-    std::shared_ptr<std::atomic<bool>> running_;
+    bool* running_;
     std::shared_ptr<pthread_mutex_t> mtx_;
     
     // Miembros puntero crudo (interfaz antigua, compatibilidad)

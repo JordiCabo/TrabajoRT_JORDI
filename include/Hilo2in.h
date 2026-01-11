@@ -61,7 +61,7 @@ public:
             std::shared_ptr<double> input1, 
             std::shared_ptr<double> input2, 
             std::shared_ptr<double> output, 
-            std::shared_ptr<bool> running, 
+             bool* running,
             std::shared_ptr<pthread_mutex_t> mtx, 
             double frequency=100);
 
@@ -100,7 +100,7 @@ private:
     std::shared_ptr<double> input1_;
     std::shared_ptr<double> input2_;
     std::shared_ptr<double> output_;
-    std::shared_ptr<bool> running_;
+    bool* running_;
     std::shared_ptr<pthread_mutex_t> mtx_;
     
     // Raw pointers (compatibilidad)

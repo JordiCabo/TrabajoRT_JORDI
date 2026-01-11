@@ -85,7 +85,7 @@ public:
      */
     HiloSwitch(std::shared_ptr<SignalGenerator::SignalSwitch> signalSwitch, 
                std::shared_ptr<double> output,
-               std::shared_ptr<bool> running, 
+               bool* running,
                std::shared_ptr<pthread_mutex_t> mtx, 
                std::shared_ptr<ParametrosCompartidos> params,
                double frequency);
@@ -113,7 +113,7 @@ private:
     // Smart pointers
     std::shared_ptr<SignalGenerator::SignalSwitch> signalSwitch_;
     std::shared_ptr<double> output_;
-    std::shared_ptr<bool> running_;
+    bool* running_;
     std::shared_ptr<pthread_mutex_t> mtx_;
     std::shared_ptr<ParametrosCompartidos> params_;
     

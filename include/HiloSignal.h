@@ -62,7 +62,7 @@ public:
      */
     HiloSignal(std::shared_ptr<Signal> signal, 
                std::shared_ptr<double> output, 
-               std::shared_ptr<std::atomic<bool>> running,
+               bool* running,
                std::shared_ptr<pthread_mutex_t> mtx, 
                double frequency);
 
@@ -94,7 +94,7 @@ private:
     // Smart pointers (nueva interfaz)
     std::shared_ptr<Signal> signal_;
     std::shared_ptr<double> output_;
-    std::shared_ptr<std::atomic<bool>> running_;
+    bool* running_;
     std::shared_ptr<pthread_mutex_t> mtx_;
     
     // Punteros crudos (interfaz antigua, compatibilidad)
