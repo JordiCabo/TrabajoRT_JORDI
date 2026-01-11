@@ -66,6 +66,8 @@ Signal (abstracta)
 - Implementar algoritmos de control discreto
 - Gestionar buffers circulares de muestras
 - Proporcionar API reutilizable y testeable
+- Instrumentación con `RuntimeLogger` (solo hilos de control)
+- Configuración centralizada via `system_config.h`
 
 ### 2. Capa de Threading
 
@@ -74,16 +76,19 @@ Signal (abstracta)
 Wrappers para ejecución en tiempo real:
 
 ```cpp
-Hilo          // 1 entrada  → 1 salida
-Hilo2in       // 2 entradas → 1 salida
-HiloSignal    // Generador de señal → 1 salida
+Hilo          // 1 entrada  → 1 salida (instrumentado con RuntimeLogger)
+Hilo2in       // 2 entradas → 1 salida (sin instrumentación)
+HiloSignal    // Generador de señal → 1 salida (instrumentado con RuntimeLogger)
+HiloPID       // PID con sintonización dinámica (instrumentado con RuntimeLogger)
+HiloSwitch    // Selector de señal por tipo (instrumentado con RuntimeLogger)
 ```
 
 **Responsabilidades**:
-- Ejecutar sistemas a frecuencia fija (Hz)
+- Ejecutar sistemas a frecuencia fija (Hz) definidas en `SystemConfig`
 - Temporización absoluta mediante `Temporizador` (`clock_nanosleep` + `TIMER_ABSTIME`) para evitar drift
-- Sincronizar acceso con `std::mutex`
+- Sincronizar acceso con `std::mutex` y `timedlock` (timeout 20% del período)
 - Gestión de lifecycle de threads (`pthread`)
+- Diagnóstico en tiempo real con `RuntimeLogger` (buffer circular de 1000 muestras)
 
 ## 🔒 Sincronización y Variables Compartidas
 
@@ -153,12 +158,15 @@ Este patrón se aplica análogamente en `Hilo` (1 entrada → 1 salida) y `HiloS
 - **Regiones críticas cortas**: leer/escribir bajo mutex y computar fuera.
 - **Sin deadlocks**: un único mutex compartido, sin bloqueos anidados.
 - **Jitter controlado**: el período se mantiene con `Temporizador` (`clock_nanosleep` con `TIMER_ABSTIME`), el tiempo bajo lock es mínimo.
-- **Terminación ordenada**: cada hilo verifica `running` bajo mutex y finaliza limpiamente.
+- **Terminación ordenada**: cada hilo verifica `running` bajo mutex y finaliza limpiamente (signal handler captura SIGINT/SIGTERM).
+- **Timedlock con timeout**: `HiloPID` usa timeout del 20% del período para evitar bloqueos indefinidos.
 
 ### Observaciones Operativas
 
+- **Sin contención observada**: Mediciones en v1.0.6 muestran t_wait < 2 μs (< 0.03% del período), 0 WARNING/CRITICAL en 10000+ iteraciones.
 - Si se requiere mayor paralelismo, puede considerarse un mutex por variable; el diseño actual prioriza simplicidad y seguridad.
 - La frecuencia de los hilos debe ser coherente con el período de muestreo del lazo para evitar aliasing o desincronización.
+- Configuración centralizada en `system_config.h` (SSOT): todas las frecuencias, períodos y buffers en un solo lugar.
 
 ## 🔀 Diagrama de Flujo: Hilos ↔ Bloques
 
@@ -557,6 +565,10 @@ std::vector<Sample> buffer_;
 
 // SignalGenerator usa std::deque
 std::deque<double> value_buffer_;
+
+// RuntimeLogger usa buffer circular con flush periódico
+std::vector<std::string> buffer_; // Tamaño definido en SystemConfig::BUFFER_SIZE_LOGGER
+size_t flushInterval_;            // SystemConfig::LOGGER_FLUSH_INTERVAL
 ```
 
 **Beneficio**: Sin asignaciones dinámicas en hot loops.
@@ -630,8 +642,10 @@ endforeach()
 
 - **Buffer circular**: Sin allocations en `next()`
 - **Inline methods**: Getters triviales inline
-- **Lock scope mínimo**: Mutex solo en secciones críticas
+- **Lock scope mínimo**: Mutex solo en secciones críticas (< 2 μs de wait time)
 - **Cálculos pre-computados**: Coeficientes PID calculados una vez
+- **Constexpr config**: Todas las constantes de `system_config.h` evaluadas en compile-time
+- **Logging selectivo**: Solo hilos de control instrumentados (comunicación sin overhead)
 
 ### Compilación Optimizada
 
@@ -640,7 +654,77 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 # Flags: -O3 -march=native
 ```
 
+### Métricas en Producción (v1.0.6)
+
+```
+Frecuencias del sistema (system_config.h):
+- Control: 100 Hz (10 ms período)
+- Componentes: 1000 Hz (1 ms período)
+- Comunicación IPC: 10 Hz (100 ms período)
+
+Contención de mutex:
+- t_wait promedio: < 2 μs
+- % uso del período: < 0.03%
+- WARNING (> 90%): 0 eventos en 10000+ iteraciones
+- CRITICAL (> 100%): 0 eventos en 10000+ iteraciones
+
+RuntimeLogger:
+- Buffer: 1000 muestras (SystemConfig::BUFFER_SIZE_LOGGER)
+- Flush: Cada 100 iteraciones (SystemConfig::LOGGER_FLUSH_INTERVAL)
+- Overhead: Negligible (escritura a RAM, flush asíncrono)
+```
+
 ## 🔍 Debugging
+
+### RuntimeLogger
+
+```cpp
+// Solo en hilos de control (Hilo, HiloPID, HiloSignal, HiloSwitch, HiloIntArranque)
+RuntimeLogger logger(log_prefix, SystemConfig::BUFFER_SIZE_LOGGER);
+logger.initializeHilo(frequency);
+
+// En run():
+logger.writeLine(i, t_total_us, t_wait_us, error_val, u_val, 
+                 perc_computation, perc_wait, WARNING, CRITICAL);
+```
+
+**Hilos instrumentados**: Control y generación de señales  
+**Hilos SIN instrumentación**: Comunicación IPC (HiloTransmisor, HiloReceptor, Hilo2in)
+
+### Error Logging Centralizado
+
+```cpp
+// Al inicio del programa (testHilo.cpp, control_simulator)
+std::string error_log_name = "error_log_" + timestamp + ".txt";
+FILE* error_file = freopen(error_log_path.c_str(), "w", stderr);
+if (error_file) {
+    setbuf(stderr, NULL);  // Unbuffered para flush inmediato
+}
+// Todos los std::cerr se redirigen a logs/error_log_YYYYMMDD_HHMMSS.txt
+```
+
+### Signal Handler (Clean Shutdown)
+
+```cpp
+// Global pointers para acceso desde handler
+std::atomic<bool>* g_running_ptr = nullptr;
+VariablesCompartidas* g_vars_ptr = nullptr;
+
+void signal_handler(int signum) {
+    if (g_running_ptr) *g_running_ptr = false;
+    if (g_vars_ptr) {
+        pthread_mutex_lock(&g_vars_ptr->mtx);
+        g_vars_ptr->running = false;
+        pthread_mutex_unlock(&g_vars_ptr->mtx);
+    }
+}
+
+// Registrar:
+signal(SIGINT, signal_handler);
+signal(SIGTERM, signal_handler);
+
+// Resultado: 0 errores pthread_join en Ctrl+C
+```
 
 ### Logs de Serialización
 

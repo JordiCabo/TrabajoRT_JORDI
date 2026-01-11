@@ -196,8 +196,13 @@ HiloTransmisor hilo_tx(&transmisor, &running, &mtx, 50);                   // En
 
 ## Características de Tiempo Real
 
-- Ejecución pthread a frecuencia fija (Hz configurable)
-- Sincronización con `std::mutex` y `std::lock_guard`
+- Ejecución pthread a frecuencia fija (Hz definida en `system_config.h`)
+- Sincronización con `std::mutex`, `std::lock_guard` y `pthread_mutex_timedlock` (timeout 20% período)
+- Temporización absoluta con `Temporizador` para eliminar drift (`clock_nanosleep` + `TIMER_ABSTIME`)
+- **RuntimeLogger** con buffer circular para diagnóstico en tiempo real (solo hilos de control)
+- Signal handler (SIGINT/SIGTERM) para parada limpia sin errores pthread_join
+- Error logging centralizado: stderr redirigido a `logs/error_log_YYYYMMDD_HHMMSS.txt`
+- Configuración centralizada (SSOT) en `system_config.h`: frecuencias, períodos, buffers
 - Buffer circular para evitar asignaciones dinámicas
 - Variables compartidas protegidas en todo momento
 

@@ -12,12 +12,15 @@ Framework educativo de control de sistemas en tiempo real implementado en C++17.
 
 ### Características Principales
 
-- 🎛️ **Controladores PID discretos** con sintonización en línea
+- 🎛️ **Controladores PID discretos** con sintonización en línea y timedlock (timeout 20%)
 - 📊 **Sistemas en espacio de estados** y funciones de transferencia
 - 📐 **Discretizador continuo→discreto** por Tustin (bilineal) con `Discretizer`
 - 📡 **Generadores de señal** (escalón, rampa, senoidal, PWM)
 - 🧵 **Ejecución multihilo** con temporización absoluta (`Temporizador` + `clock_nanosleep`)
 - 🔄 **Convertidores A/D y D/A** simulados
+- 📝 **RuntimeLogger** con buffer circular para diagnóstico en tiempo real
+- 🔒 **Signal handler** (SIGINT/SIGTERM) para parada limpia de hilos
+- ⚙️ **Configuración centralizada** (SSOT) en `system_config.h`
 
 ## 🏗️ Arquitectura
 

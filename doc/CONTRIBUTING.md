@@ -210,7 +210,7 @@ double computeOutput(double input);
 double samplingTime;
 double sampling_time;  // También aceptable
 
-// Constantes: UPPER_SNAKE_CASE
+// Constantes: UPPER_SNAKE_CASE (preferiblemente en system_config.h)
 const int MAX_BUFFER_SIZE = 1000;
 
 // Miembros privados: terminan en _
@@ -220,6 +220,24 @@ private:
     std::mutex mtx_;
 };
 ```
+
+### Configuración Centralizada
+
+**IMPORTANTE**: Todas las frecuencias, períodos y tamaños de buffer deben definirse en `include/system_config.h`:
+
+```cpp
+// ✅ CORRECTO: Usar constantes de system_config.h
+#include "system_config.h"
+double ts = SystemConfig::TS_CONTROLLER;
+double freq = SystemConfig::FREQ_COMMUNICATION;
+size_t buffer_size = SystemConfig::BUFFER_SIZE_LOGGER;
+
+// ❌ INCORRECTO: Hardcodear valores
+double ts = 0.01;  // NO - usar SystemConfig::TS_CONTROLLER
+double freq = 50.0;  // NO - usar SystemConfig::FREQ_COMMUNICATION
+```
+
+**Single Source of Truth (SSOT)**: `system_config.h` es el único lugar para definir configuración del sistema.
 
 ### Patrón NVI
 

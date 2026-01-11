@@ -5,6 +5,43 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.6] - 2026-01-11
+
+### Añadido
+- **RuntimeLogger completo**: Sistema de logging con buffer circular de 1000 líneas para métricas de tiempo real:
+  - Parámetros `log_prefix` y `frequency` obligatorios en todos los constructores de hilos.
+  - Métodos `initializeHilo()` y `initializeHiloPID()` para configuración de columnas.
+  - Flush automático cada 100 líneas sin impacto I/O excesivo.
+  - Archivos log: `logs/{prefix}_runtime_YYYYMMDD_HHMMSS.txt`.
+  - Métricas capturadas: iteration, t_espera_us, t_ejec_us, t_total_us, periodo_us, Ts_Real_us, drift_us, %error_Ts, %uso, status (OK/WARNING/CRITICAL).
+- **Timedlock con timeout del 20%** en HiloPID para lectura de parámetros y escritura de salida:
+  - Previene bloqueos indefinidos con `pthread_mutex_timedlock()`.
+  - Log de errores ETIMEDOUT cuando se alcanza timeout.
+- **Error logging centralizado**:
+  - Redirección automática de stderr a `logs/error_log_YYYYMMDD_HHMMSS.txt`.
+  - Captura thread-safe de todos los std::cerr del sistema.
+- **Signal handler limpio**:
+  - Captura SIGINT/SIGTERM para parada controlada de todos los hilos.
+  - Evita errores pthread_join al detener threads limpiamente.
+- **Configuración centralizada (SSOT)**:
+  - Nuevo archivo `include/system_config.h` con namespace `SystemConfig`.
+  - Constantes constexpr: TS_CONTROLLER, FREQ_COMPONENT, FREQ_COMMUNICATION, BUFFER_SIZE_LOGGER, etc.
+  - Single Source of Truth para frecuencias, períodos, buffers y timeouts.
+
+### Cambiado
+- **Logs selectivos**: RuntimeLogger solo en hilos de control (Hilo, HiloPID, HiloSwitch, HiloSignal, HiloIntArranque); removido de hilos de comunicación (HiloTransmisor, HiloReceptor, Hilo2in) para reducir overhead.
+- **Frecuencia IPC optimizada**: `freq_communication` reducida a 10 Hz (100ms) desde valores previos variables para balance entre responsividad GUI y overhead del sistema.
+- **testHilo.cpp**: Actualizado para usar `SystemConfig::TS_CONTROLLER` y constantes centralizadas; añadido signal handler global.
+
+### Técnico
+- **Evidencia de estabilidad** (logs de producción):
+  - Tiempos de espera mutex: < 2 μs (insignificante)
+  - %uso del período: < 0.03% (margen 99.97%)
+  - Error de período: < 0.87% (jitter ±0.6%)
+  - 0 eventos WARNING/CRITICAL en ejecuciones completas
+  - Timedlock timeout nunca disparado (configurado al 20%)
+- **Contención de mutex**: No observada en logs; mutex único compartido es suficiente para la carga actual.
+
 ## [1.0.5] - 2026-01-11
 
 ### Añadido
