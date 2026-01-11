@@ -13,6 +13,8 @@
 #include <iostream>
 #include <unistd.h>
 #include <mutex>
+#include <memory>
+#include <atomic>
 #include <csignal>
 #include "DiscreteSystem.h"
 #include "VariablesCompartidas.h"
@@ -53,62 +55,39 @@ namespace DiscreteSystems {
 class HiloPID {
 public:
     /**
-     * @brief Constructor que inicia la ejecución del hilo con parámetros dinámicos
-     * 
-     * @param pid Puntero al PIDController a ejecutar
-     * @param vars Puntero a VariablesCompartidas (ref, e, u, yk, ykd, running con mutex)
-     * @param params Puntero a ParametrosCompartidos (kp, ki, kd, setpoint con su propio mutex)
-     * @param frequency Frecuencia de ejecución en Hz (período = 1/frequency)
-     * 
-     * @note El hilo comienza a ejecutarse inmediatamente desde el constructor
-     * @note Lee kp/ki/kd de params en cada ciclo, permitiendo sintonización en línea
-     * @note Accede a vars->e (entrada) y vars->u (salida) con lock(vars->mtx)
+     * @brief Constructor con smart pointers (recomendado)
+     */
+    HiloPID(std::shared_ptr<DiscreteSystem> pid, 
+            std::shared_ptr<VariablesCompartidas> vars,
+            std::shared_ptr<ParametrosCompartidos> params, 
+            double frequency=100);
+
+    /**
+     * @brief Constructor con punteros crudos (compatibilidad)
+     * @deprecated Usar constructor con smart pointers
      */
     HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars, 
             ParametrosCompartidos* params, double frequency=100);
 
-    /**
-     * @brief Obtiene el identificador del hilo pthread
-     * @return pthread_t ID del hilo
-     */
     pthread_t getThread() const { return thread_; }
 
-    /**
-     * @brief Destructor que espera a que termine el hilo
-     * 
-     * Ejecuta pthread_join() para asegurar que el hilo finaliza
-     * correctamente antes de destruir el objeto.
-     */
     ~HiloPID();
 
 private:
-    DiscreteSystem* system_;          ///< Puntero al PIDController a ejecutar
-    VariablesCompartidas* vars_;      ///< Puntero a variables compartidas (ref, e, u, yk, ykd, running)
-    ParametrosCompartidos* params_;   ///< Puntero a parámetros dinámicos (kp, ki, kd, setpoint)
-    int iterations_;                  ///< Número de iteraciones ejecutadas
-    double frequency_;                ///< Frecuencia de ejecución en Hz
+    // Smart pointers
+    std::shared_ptr<DiscreteSystem> system_;
+    std::shared_ptr<VariablesCompartidas> vars_;
+    std::shared_ptr<ParametrosCompartidos> params_;
+    
+    // Raw pointers (compatibilidad)
+    DiscreteSystem* system_raw_;
+    VariablesCompartidas* vars_raw_;
+    ParametrosCompartidos* params_raw_;
 
-    pthread_t thread_;                ///< Identificador del hilo pthread
+    double frequency_;
+    pthread_t thread_;
 
-    /**
-     * @brief Función estática de punto de entrada del hilo
-     * 
-     * @param arg Puntero a this (el objeto Hilo)
-     * @return nullptr
-     * 
-     * @note Esta es la función que pthread llama; internamente invoca run()
-     */
     static void* threadFunc(void* arg);
-
-    /**
-     * @brief Loop principal de ejecución del hilo con actualización de parámetros
-     * 
-     * Ejecuta el PID en bucle a la frecuencia especificada mientras
-     * vars_->running sea true. En cada ciclo:
-     * 1. Lee kp/ki/kd de params_ con lock(params_->mtx)
-     * 2. Actualiza el PID con setKp/setKi/setKd
-     * 3. Lee vars_->e y escribe vars_->u con lock(vars_->mtx)
-     */
     void run();
 };
 

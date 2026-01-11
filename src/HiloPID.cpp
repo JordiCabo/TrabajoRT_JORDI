@@ -14,14 +14,26 @@
 namespace DiscreteSystems {
 
 /**
- * @brief Constructor que crea e inicia el hilo pthread
- * 
- * Crea un nuevo hilo pthread que ejecutará la función threadFunc,
- * iniciando la simulación del PID con actualización dinámica de parámetros.
+ * @brief Constructor con smart pointers
+ */
+HiloPID::HiloPID(std::shared_ptr<DiscreteSystem> pid, 
+                 std::shared_ptr<VariablesCompartidas> vars,
+                 std::shared_ptr<ParametrosCompartidos> params, 
+                 double frequency)
+    : system_(pid), vars_(vars), params_(params), frequency_(frequency),
+      system_raw_(nullptr), vars_raw_(nullptr), params_raw_(nullptr)
+{
+    pthread_create(&thread_, nullptr, &HiloPID::threadFunc, this);
+}
+
+/**
+ * @brief Constructor con punteros crudos (compatibilidad)
  */
 HiloPID::HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars, 
                  ParametrosCompartidos* params, double frequency)
-    : system_(pid), vars_(vars), params_(params), frequency_(frequency), iterations_(0) {
+    : system_(nullptr), vars_(nullptr), params_(nullptr), frequency_(frequency),
+      system_raw_(pid), vars_raw_(vars), params_raw_(params)
+{
     pthread_create(&thread_, nullptr, &HiloPID::threadFunc, this);
 }
 
@@ -64,47 +76,50 @@ void* HiloPID::threadFunc(void* arg) {
  * @invariant Acceso a vars_ y params_ protegido por sus respectivos mutex
  */
 void HiloPID::run() {
-    // Crear temporizador con retardo absoluto (evita drift acumulativo)
     Temporizador timer(frequency_);
 
-    // Cast a PIDController para usar setGains
-    PIDController* pid = dynamic_cast<PIDController*>(system_);
+    // Obtener punteros a los objetos
+    DiscreteSystem* sys = system_ ? system_.get() : system_raw_;
+    VariablesCompartidas* vars = vars_ ? vars_.get() : vars_raw_;
+    ParametrosCompartidos* params = params_ ? params_.get() : params_raw_;
+    
+    if (!sys || !vars || !params) {
+        return;
+    }
+    
+    PIDController* pid = dynamic_cast<PIDController*>(sys);
     
     while (true) {
-        // Verificar si debe seguir ejecutando
-        pthread_mutex_lock(&vars_->mtx);
-        bool running = vars_->running;
-        pthread_mutex_unlock(&vars_->mtx);
+        pthread_mutex_lock(&vars->mtx);
+        bool running = vars->running;
+        pthread_mutex_unlock(&vars->mtx);
         
         if (!running)
-            break; // salir si se recibió SIGINT/SIGTERM o running es false
+            break;
 
-        // 2. Leer parámetros dinámicos (kp, ki, kd) con su propio mutex
-        pthread_mutex_lock(&params_->mtx);
-        double kp = params_->kp;
-        double ki = params_->ki;
-        double kd = params_->kd;
-        pthread_mutex_unlock(&params_->mtx);
+        // Leer parámetros dinámicos
+        pthread_mutex_lock(&params->mtx);
+        double kp = params->kp;
+        double ki = params->ki;
+        double kd = params->kd;
+        pthread_mutex_unlock(&params->mtx);
 
-        // 3. Actualizar ganancias del PID (fuera de sección crítica)
+        // Actualizar ganancias del PID
         if (pid != nullptr) {
             pid->setGains(kp, ki, kd);
         }
 
-        // 4. Leer entrada (error), ejecutar PID, escribir salida (control)
-        pthread_mutex_lock(&vars_->mtx);
-        double input = vars_->e;              // Leer error
-        double output = system_->next(input); // Ejecutar PID
-        vars_->u = output;                    // Escribir acción de control
-        pthread_mutex_unlock(&vars_->mtx);
+        // Leer entrada, ejecutar PID, escribir salida
+        pthread_mutex_lock(&vars->mtx);
+        double input = vars->e;
+        double output = sys->next(input);
+        vars->u = output;
+        pthread_mutex_unlock(&vars->mtx);
 
-        // 5. Dormir hasta el siguiente período absoluto (sin drift)
         timer.esperar();
-        iterations_++;
     }
 
     pthread_exit(nullptr);
 }
-
 
 } // namespace DiscreteSystems
