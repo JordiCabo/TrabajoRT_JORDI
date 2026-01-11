@@ -16,7 +16,9 @@
 #include <memory>
 #include <atomic>
 #include <csignal>
+#include <string>
 #include "DiscreteSystem.h"
+#include "RuntimeLogger.h"
 
 // Variable de control global para manejo de señales
 extern volatile sig_atomic_t g_signal_run;
@@ -56,6 +58,7 @@ public:
      * @param running Smart pointer a variable booleana de control
      * @param mtx Smart pointer al mutex POSIX compartido
      * @param frequency Frecuencia de ejecución en Hz
+     * @param log_prefix Prefijo para archivos de log (ej: "Sumador")
      */
     Hilo2in(std::shared_ptr<DiscreteSystem> system, 
             std::shared_ptr<double> input1, 
@@ -63,11 +66,11 @@ public:
             std::shared_ptr<double> output, 
              bool* running,
             std::shared_ptr<pthread_mutex_t> mtx, 
-            double frequency);
-
+            double frequency,
+            const std::string& log_prefix);
+    
     /**
      * @brief Constructor con punteros crudos (compatibilidad)
-     * @deprecated Usar constructor con smart pointers
      * 
      * @param system Puntero al sistema discreto a ejecutar (debe soportar dos entradas)
      * @param input1 Puntero a la primera variable de entrada del sistema
@@ -76,10 +79,11 @@ public:
      * @param running Puntero a variable booleana de control; cuando es false, el hilo se detiene
      * @param mtx Puntero al mutex que protege las variables compartidas
      * @param frequency Frecuencia de ejecución en Hz (período = 1/frequency)
+     * @param log_prefix Prefijo para archivos de log
      */
-        Hilo2in(DiscreteSystem* system, double* input1, double* input2, double* output, 
-            bool *running, pthread_mutex_t* mtx, double frequency);
-
+    Hilo2in(DiscreteSystem* system, double* input1, double* input2, double* output, 
+                 bool *running, pthread_mutex_t* mtx, double frequency,
+                 const std::string& log_prefix);
     /**
      * @brief Obtiene el identificador del hilo pthread
      * @return pthread_t ID del hilo
@@ -113,6 +117,11 @@ private:
 
     double frequency_;          ///< Frecuencia de ejecución en Hz
     pthread_t thread_;          ///< Identificador del hilo pthread
+    
+    // RuntimeLogger para diagnóstico
+    RuntimeLogger logger_;
+    double t_prev_iteration_;
+    size_t iterations_;
 
     /**
      * @brief Función estática de punto de entrada del hilo

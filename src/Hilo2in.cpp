@@ -7,9 +7,11 @@
 
 #include "Hilo2in.h"
 #include "../include/Temporizador.h"
+#include "system_config.h"
 #include <csignal>
 #include <iostream>
 #include <stdexcept>
+#include <ctime>
 
 namespace DiscreteSystems {
 
@@ -22,11 +24,14 @@ Hilo2in::Hilo2in(std::shared_ptr<DiscreteSystem> system,
                  std::shared_ptr<double> output, 
                  bool* running,
                  std::shared_ptr<pthread_mutex_t> mtx, 
-                 double frequency)
+                 double frequency,
+                 const std::string& log_prefix)
     : system_(system), input1_(input1), input2_(input2), output_(output),
       running_(running), mtx_(mtx), frequency_(frequency),
       system_raw_(nullptr), input1_raw_(nullptr), input2_raw_(nullptr),
-      output_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr)
+      output_raw_(nullptr), running_raw_(nullptr), mtx_raw_(nullptr),
+      logger_(log_prefix, SystemConfig::BUFFER_SIZE_LOGGER),
+      t_prev_iteration_(0.0), iterations_(0)
 {
     int ret = pthread_create(&thread_, nullptr, &Hilo2in::threadFunc, this);
     if (ret != 0) {
@@ -39,11 +44,14 @@ Hilo2in::Hilo2in(std::shared_ptr<DiscreteSystem> system,
  * @brief Constructor con punteros crudos (compatibilidad)
  */
 Hilo2in::Hilo2in(DiscreteSystem* system, double* input1, double* input2, double* output,
-                 bool *running, pthread_mutex_t* mtx, double frequency)
+                 bool *running, pthread_mutex_t* mtx, double frequency,
+                 const std::string& log_prefix)
     : system_(nullptr), input1_(nullptr), input2_(nullptr), output_(nullptr),
       running_(nullptr), mtx_(nullptr), frequency_(frequency),
       system_raw_(system), input1_raw_(input1), input2_raw_(input2),
-      output_raw_(output), running_raw_(running), mtx_raw_(mtx)
+      output_raw_(output), running_raw_(running), mtx_raw_(mtx),
+      logger_(log_prefix, SystemConfig::BUFFER_SIZE_LOGGER),
+      t_prev_iteration_(0.0), iterations_(0)
 {
     int ret = pthread_create(&thread_, nullptr, &Hilo2in::threadFunc, this);
     if (ret != 0) {
@@ -93,6 +101,9 @@ void* Hilo2in::threadFunc(void* arg) {
 void Hilo2in::run() {
     // Temporizador con retardo absoluto para evitar drift
     Temporizador timer(frequency_);
+    
+    // Inicializar logger
+    logger_.initializeHilo(frequency_);
 
     // Obtener punteros a los objetos
     DiscreteSystem* sys = system_ ? system_.get() : system_raw_;
@@ -104,8 +115,13 @@ void Hilo2in::run() {
     if (!sys || !in1 || !in2 || !out || !mtx) {
         return;
     }
+    
+    struct timespec t_start, t_end;
+    const double period_us = 1e6 / frequency_;
 
     while (true) {
+        clock_gettime(CLOCK_MONOTONIC, &t_start);
+        
         bool isRunning;
         pthread_mutex_lock(mtx);
         isRunning = running_ ? *running_ : *running_raw_;
@@ -114,18 +130,62 @@ void Hilo2in::run() {
         if (!isRunning)
             break; // salir si se recibió SIGINT/SIGTERM o running_ es false
 
+        // Medir t_wait (tiempo esperando en lock)
+        struct timespec t_before_read, t_after_read;
+        clock_gettime(CLOCK_MONOTONIC, &t_before_read);
+        
         double in1_val, in2_val;
         
         pthread_mutex_lock(mtx);
         in1_val = *in1;
         in2_val = *in2;
         pthread_mutex_unlock(mtx);
+        
+        clock_gettime(CLOCK_MONOTONIC, &t_after_read);
 
         double y = sys->next(in1_val, in2_val);
 
         pthread_mutex_lock(mtx);
         *out = y;
         pthread_mutex_unlock(mtx);
+        
+        clock_gettime(CLOCK_MONOTONIC, &t_end);
+        
+        // Calcular tiempos
+        double t_wait_us = (t_after_read.tv_sec - t_before_read.tv_sec) * 1e6
+                         + (t_after_read.tv_nsec - t_before_read.tv_nsec) / 1000.0;
+        double t_total_us = (t_end.tv_sec - t_start.tv_sec) * 1e6
+                          + (t_end.tv_nsec - t_start.tv_nsec) / 1000.0;
+        
+        // Calcular período real (ts_real)
+        double ts_real_us = 0.0;
+        if (iterations_ > 0) {
+            double t_current = t_end.tv_sec * 1e6 + t_end.tv_nsec / 1000.0;
+            ts_real_us = t_current - t_prev_iteration_;
+        }
+        t_prev_iteration_ = t_end.tv_sec * 1e6 + t_end.tv_nsec / 1000.0;
+        
+        // t_ejec = t_total - t_wait
+        double t_ejec_us = t_total_us - t_wait_us;
+        
+        // Determinar status
+        double perc_computation = (t_total_us / period_us) * 100.0;
+        const char* status = "OK";
+        if (perc_computation > (SystemConfig::CRITICAL_THRESHOLD * 100.0)) {
+            status = "CRITICAL";
+        } else if (perc_computation > (SystemConfig::WARNING_THRESHOLD * 100.0)) {
+            status = "WARNING";
+        }
+        
+        // Guardar en logger
+        logger_.writeLine(iterations_, t_wait_us, t_ejec_us, t_total_us, 
+                         period_us, ts_real_us, status);
+        
+        iterations_++;
+        
+        if (iterations_ % SystemConfig::LOGGER_FLUSH_INTERVAL == 0) {
+            logger_.flush();
+        }
 
         timer.esperar();
     }

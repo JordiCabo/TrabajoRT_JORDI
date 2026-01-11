@@ -216,7 +216,7 @@ int main() {
     auto sumador = std::make_shared<Sumador>(Ts_sumador);
     std::shared_ptr<double> e(&vars->e, [](double*){});
     // Sumador lee vars->ref y vars->ykd, escribe vars->e (error = ref - ykd)
-    Hilo2in hiloSumador(sumador, ref, ykd, e, running.get(), mtx, freq_component);
+    Hilo2in hiloSumador(sumador, ref, ykd, e, running.get(), mtx, freq_component, "Sumador");
 
     //-------------------------------------------------------------
     // -------- Crear transmisor para enviar datos via IPC --------
