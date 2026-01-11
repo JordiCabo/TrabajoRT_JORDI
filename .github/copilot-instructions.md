@@ -11,6 +11,7 @@ Framework de control de sistemas en tiempo real desarrollado como Trabajo Final 
 - **DiscreteSystem**: Clase base NVI (Non-Virtual Interface) para todos los sistemas discretos. El método público `next(double)` almacena muestras en buffer circular; las subclases solo sobrescriben el método protegido `compute()`
 - **Generadores de Señal**: Composición con `std::shared_ptr<Signal>` (seno, escalón, rampa). Usa `compute()` para obtener valores sin avanzar el tiempo, `next()` para avanzar
 - **Hilo** (threading): `Hilo` envuelve un `DiscreteSystem` con ejecución pthread a frecuencia fija (Hz). Protege variables compartidas con `std::mutex`
+- **RuntimeLogger**: Instrumentación de diagnóstico solo en hilos de control (Hilo, Hilo2in, HiloPID, HiloSignal, HiloSwitch, HiloIntArranque). Hilos de comunicación IPC (HiloTransmisor, HiloReceptor) sin logging para reducir overhead
 
 ### Capa de GUI/Comunicación
 - **Patrón IPC**: Colas de mensajes POSIX (mqueue) conectan proceso simulador → GUI Qt
@@ -95,6 +96,8 @@ int main() {
 | `include/DiscreteSystem.h` | Clase base + patrón buffer circular |
 | `include/SignalGenerator.h` | API de composición de señales reutilizable |
 | `include/Hilo.h` | Wrapper de threading en tiempo real |
+| `include/RuntimeLogger.h` | Instrumentación diagnóstico (buffer circular, flush periódico) |
+| `include/system_config.h` | Configuración centralizada (SSOT): frecuencias, períodos, buffers |
 | `Interfaz_Control/src/comm.h` | Interfaz de serialización IPC |
 | `Interfaz_Control/src/messages.h` | Definiciones DataMessage/ParamsMessage |
 | `CMakeLists.txt` (raíz) | Auto-descubrimiento de tests |

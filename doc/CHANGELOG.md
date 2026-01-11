@@ -29,7 +29,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Single Source of Truth para frecuencias, períodos, buffers y timeouts.
 
 ### Cambiado
-- **Logs selectivos**: RuntimeLogger solo en hilos de control (Hilo, HiloPID, HiloSwitch, HiloSignal, HiloIntArranque); removido de hilos de comunicación (HiloTransmisor, HiloReceptor, Hilo2in) para reducir overhead.
+- **Logs selectivos**: RuntimeLogger solo en hilos de control (Hilo, Hilo2in/Sumador, HiloPID, HiloSwitch, HiloSignal, HiloIntArranque); removido de hilos de comunicación IPC (HiloTransmisor, HiloReceptor) para reducir overhead.
 - **Frecuencia IPC optimizada**: `freq_communication` reducida a 10 Hz (100ms) desde valores previos variables para balance entre responsividad GUI y overhead del sistema.
 - **testHilo.cpp**: Actualizado para usar `SystemConfig::TS_CONTROLLER` y constantes centralizadas; añadido signal handler global.
 

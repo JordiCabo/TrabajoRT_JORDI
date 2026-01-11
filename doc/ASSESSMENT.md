@@ -24,7 +24,7 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
   - Parámetros `log_prefix` y `frequency` obligatorios en todos los hilos para trazabilidad multi-instancia.
   - Medición precisa de período real (Ts_Real_us) vs configurado: **error < 0.87%** en ejecución estable.
   - Análisis de jitter y drift: %error_Ts oscila entre ±~0.6%, con variación no acumulativa.
-  - Logs selectivos: solo hilos de control (Hilo, HiloPID, HiloSwitch, HiloSignal, HiloIntArranque) generan logs; hilos de comunicación (HiloTransmisor, HiloReceptor, Hilo2in/Sumador) sin overhead de logging.
+  - Logs selectivos: solo hilos de control (Hilo, Hilo2in, HiloPID, HiloSwitch, HiloSignal, HiloIntArranque) generan logs; hilos de comunicación IPC (HiloTransmisor, HiloReceptor) sin overhead de logging.
   - Redirección automática de stderr a `error_log_YYYYMMDD_HHMMSS.txt` para captura centralizada de errores.
   - Signal handler (SIGINT/SIGTERM) para parada limpia de todos los hilos sin errores pthread_join.
   - Frecuencia de comunicación IPC optimizada a 10 Hz (100ms) para balance entre responsividad GUI y overhead del sistema.

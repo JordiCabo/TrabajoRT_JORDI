@@ -77,7 +77,7 @@ Wrappers para ejecución en tiempo real:
 
 ```cpp
 Hilo          // 1 entrada  → 1 salida (instrumentado con RuntimeLogger)
-Hilo2in       // 2 entradas → 1 salida (sin instrumentación)
+Hilo2in       // 2 entradas → 1 salida (instrumentado con RuntimeLogger - calcula error lazo)
 HiloSignal    // Generador de señal → 1 salida (instrumentado con RuntimeLogger)
 HiloPID       // PID con sintonización dinámica (instrumentado con RuntimeLogger)
 HiloSwitch    // Selector de señal por tipo (instrumentado con RuntimeLogger)
@@ -645,7 +645,7 @@ endforeach()
 - **Lock scope mínimo**: Mutex solo en secciones críticas (< 2 μs de wait time)
 - **Cálculos pre-computados**: Coeficientes PID calculados una vez
 - **Constexpr config**: Todas las constantes de `system_config.h` evaluadas en compile-time
-- **Logging selectivo**: Solo hilos de control instrumentados (comunicación sin overhead)
+- **Logging selectivo**: Solo hilos de control instrumentados (Hilo, Hilo2in, HiloPID, HiloSignal, HiloSwitch, HiloIntArranque); comunicación IPC sin overhead (HiloTransmisor, HiloReceptor)
 
 ### Compilación Optimizada
 
@@ -688,8 +688,8 @@ logger.writeLine(i, t_total_us, t_wait_us, error_val, u_val,
                  perc_computation, perc_wait, WARNING, CRITICAL);
 ```
 
-**Hilos instrumentados**: Control y generación de señales  
-**Hilos SIN instrumentación**: Comunicación IPC (HiloTransmisor, HiloReceptor, Hilo2in)
+**Hilos instrumentados**: Control (Hilo, Hilo2in, HiloPID, HiloSwitch, HiloIntArranque) y generación de señales (HiloSignal)  
+**Hilos SIN instrumentación**: Comunicación IPC (HiloTransmisor, HiloReceptor)
 
 ### Error Logging Centralizado
 
