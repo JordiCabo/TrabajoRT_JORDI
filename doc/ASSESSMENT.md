@@ -30,7 +30,6 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
   - Frecuencia de comunicación IPC optimizada a 10 Hz (100ms) para balance entre responsividad GUI y overhead del sistema.
 
 ## Debilidades
-- Mutex único compartido: posible contención cuando el número de hilos aumenta.
 - Sin CI/CD: no hay pipelines automáticos de build/test/análisis estático.
 - Configuración de frecuencias/periodos dispersa: no existe una fuente única de verdad centralizada.
 - Scheduling: no se configura `SCHED_FIFO/RR`; jitter depende de la carga del sistema operativo.
@@ -57,9 +56,9 @@ Este documento resume las fortalezas y debilidades del proyecto, e incluye recom
 - Portabilidad: abstracción de threading/temporización para entornos no-POSIX si se requiere.
 
 ## Riesgos y Mitigaciones
-- Contención de mutex: mantener regiones críticas cortas; separar mutex por variable si crece el número de hilos.
 - Deriva temporal: ✅ **MITIGADO** por `Temporizador` con `TIMER_ABSTIME`; considerar `SCHED_FIFO/RR` si el jitter debe reducirse aún más.
 - Fugas/manejo de recursos: ✅ **MITIGADO en v1.0.5** revisando retornos de API pthread en todas las clases `Hilo*`; evitar asignaciones innecesarias en caminos de salida.
+- Contención de mutex: ✅ **NO OBSERVADA en v1.0.6** - tiempos de espera < 2 μs, %uso < 0.03%, timedlock nunca disparó timeout. Mutex único compartido es suficiente para la carga actual.
 - Parada abrupta del sistema: ✅ **MITIGADO en v1.0.6** con signal handler que captura SIGINT/SIGTERM y detiene hilos limpiamente, evitando errores pthread_join.
 
 ## Roadmap Sugerido
