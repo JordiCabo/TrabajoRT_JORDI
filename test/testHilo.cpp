@@ -2,6 +2,12 @@
 #include <unistd.h>
 #include <mutex>
 #include <memory>
+#include <cstdio>
+#include <ctime>
+#include <csignal>
+#include <sstream>
+#include <iomanip>
+#include <sys/stat.h>
 #include "TransferFunctionSystem.h"
 #include "Hilo.h"
 #include "Hilo2in.h"
@@ -27,7 +33,45 @@
 
 using namespace DiscreteSystems;
 
+// Variables globales para signal handler
+static bool* g_running_ptr = nullptr;
+static VariablesCompartidas* g_vars_ptr = nullptr;
+
+// Signal handler para Ctrl+C (SIGINT)
+void signalHandler(int signum) {
+    std::cerr << "\n[Signal Handler] Capturado señal " << signum << " (Ctrl+C)" << std::endl;
+    std::cerr << "[Signal Handler] Deteniendo hilos de forma limpia..." << std::endl;
+    
+    if (g_running_ptr) {
+        *g_running_ptr = false;
+    }
+    if (g_vars_ptr) {
+        pthread_mutex_lock(&g_vars_ptr->mtx);
+        g_vars_ptr->running = false;
+        pthread_mutex_unlock(&g_vars_ptr->mtx);
+    }
+}
+
 int main() {
+    // --- Crear directorio de logs ---
+    mkdir("logs", 0755);
+    
+    // --- Redirigir stderr a archivo con timestamp ---
+    time_t now = time(nullptr);
+    struct tm* tm_info = localtime(&now);
+    char timestamp[32];
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
+    
+    std::ostringstream error_file;
+    error_file << "logs/error_log_" << timestamp << ".txt";
+    
+    FILE* error_log = freopen(error_file.str().c_str(), "w", stderr);
+    if (error_log) {
+        setbuf(stderr, NULL);  // Unbuffered para flush inmediato
+        std::cerr << "=== Error Log Started ===" << std::endl;
+        std::cerr << "Timestamp: " << timestamp << std::endl;
+        std::cerr << "=========================" << std::endl << std::endl;
+    }
     // --- Crear variables compartidas como shared_ptr ---
     auto vars = std::make_shared<VariablesCompartidas>();
     auto params = std::make_shared<ParametrosCompartidos>();
@@ -41,6 +85,13 @@ int main() {
     
     // --- Crear running flag compartido ---
     auto running = std::make_shared<bool>(false);  // se activará con interruptor->setRun(1)
+    
+    // --- Registrar signal handler para Ctrl+C ---
+    g_running_ptr = running.get();
+    g_vars_ptr = vars.get();
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
+    std::cerr << "[Main] Signal handlers registrados (Ctrl+C para parada limpia)" << std::endl;
     
     //-------------------------------------------------------------
     // ---------------- Frecuencias de muestreo -------------------
