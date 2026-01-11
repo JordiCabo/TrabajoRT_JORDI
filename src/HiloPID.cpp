@@ -3,19 +3,16 @@
  * @brief Implementación del wrapper especializado para PID con parámetros dinámicos
  * @author Jordi + GitHub Copilot
  * @date 2026-01-11
- * @version 1.0.6 - Added timing instrumentation and logging
+ * @version 1.0.7 - Refactored to use RuntimeLogger
  */
 
 #include "../include/HiloPID.h"
 #include "../include/PIDController.h"
 #include "../include/Temporizador.h"
 #include <iostream>
-#include <fstream>
 #include <iomanip>
 #include <sstream>
-#include <ctime>
 #include <csignal>
-#include <sys/stat.h>
 #include <errno.h>
 
 namespace DiscreteSystems {
@@ -23,50 +20,18 @@ namespace DiscreteSystems {
 /**
  * @brief Constructor que crea e inicia el hilo pthread
  * 
- * Crea el directorio logs/ si no existe, genera un archivo de log con timestamp
- * y registra información de configuración (frecuencia, período de muestreo).
- * Posteriormente crea el hilo pthread que ejecutará el PID.
+ * Inicializa el RuntimeLogger con configuración de HiloPID y crea
+ * el hilo pthread que ejecutará el PID con instrumentación de timing.
  */
 HiloPID::HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars, 
                  ParametrosCompartidos* params, double frequency)
-    : system_(pid), vars_(vars), params_(params), frequency_(frequency), iterations_(0)
+    : system_(pid), vars_(vars), params_(params), frequency_(frequency), 
+      iterations_(0), logger_("HiloPID", 1000)
 {
-    // Crear directorio logs/ en el directorio raíz si no existe
-    mkdir("../logs", 0755);
+    // Inicializar logger con configuración específica de HiloPID
+    logger_.initializeHiloPID(frequency);
     
-    // Crear nombre de archivo con timestamp
-    time_t now = time(nullptr);
-    struct tm* tm_info = localtime(&now);
-    char timestamp[32];
-    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
-    
-    std::ostringstream oss;
-    oss << "../logs/HiloPID_runtime_" << timestamp << ".txt";
-    logfile_path_ = oss.str();
-    
-    // Crear archivo y escribir header
-    std::ofstream logfile(logfile_path_);
-    if (logfile.is_open()) {
-        logfile << "HiloPID Runtime Performance Log\n";
-        logfile << "Frequency: " << frequency << " Hz\n";
-        logfile << "Sample Period: " << (1000000.0 / frequency) << " us\n";
-        logfile << "Timestamp: " << timestamp << "\n";
-        logfile << "================================================================================\n";
-        logfile << std::left << std::setw(10) << "Iteration"
-                << std::setw(14) << "t_espera_us"
-                << std::setw(14) << "t_ejec_us"
-                << std::setw(14) << "t_total_us"
-                << std::setw(14) << "periodo_us"
-                << std::setw(14) << "Ts_Real_us"
-                << std::setw(14) << "drift_us"
-                << std::setw(12) << "%error_Ts"
-                << std::setw(10) << "%uso"
-                << std::setw(12) << "Status" << "\n";
-        logfile << "--------------------------------------------------------------------------------\n";
-        logfile.close();
-    } else {
-        std::cerr << "WARNING HiloPID: Could not create log file " << logfile_path_ << std::endl;
-    }
+    std::cout << "HiloPID log: " << logger_.getLogPath() << std::endl;
     
     int ret = pthread_create(&thread_, nullptr, &HiloPID::threadFunc, this);
     if (ret != 0) {
@@ -80,13 +45,14 @@ HiloPID::HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars,
  * 
  * Ejecuta pthread_join() para asegurar que el hilo finaliza
  * correctamente antes de destruir el objeto HiloPID.
+ * RuntimeLogger escribe el buffer final automáticamente en su destructor.
  */
 HiloPID::~HiloPID() {
     int ret = pthread_join(thread_, nullptr);
     if (ret != 0) {
         std::cerr << "[HiloPID] Error: pthread_join falló con código " << ret << std::endl;
-    }    // Escribir el buffer final al archivo antes de destruir
-    writeLogFile();}
+    }
+}
 
 /**
  * @brief Función estática de punto de entrada del hilo pthread
@@ -177,7 +143,7 @@ void HiloPID::run() {
                           << " us (>" << threshold_80 << " us, 80% period). Skipping iteration.\n";
                 
                 // Log del error
-                logTiming(iterations_, t_espera_us, 0, t_espera_us, periodo_us, ts_real_us, "ERROR_MUTEX");
+                logger_.writeLine(iterations_, t_espera_us, 0, t_espera_us, periodo_us, ts_real_us, "ERROR_MUTEX");
             }
             // Saltar iteración y esperar al siguiente período
             timer.esperar();
@@ -247,103 +213,14 @@ void HiloPID::run() {
         }
         
         // Log de timing
-        logTiming(iterations_, t_espera_us, t_ejecucion_us, t_total_us, periodo_us, ts_real_us, status);
+        logger_.writeLine(iterations_, t_espera_us, t_ejecucion_us, t_total_us, 
+                          periodo_us, ts_real_us, status);
 
         // 5. Dormir hasta el siguiente período absoluto (sin drift)
         timer.esperar();
     }
 
     pthread_exit(nullptr);
-}
-
-/**
- * @brief Registra datos de timing en buffer circular de 1000 líneas
- * 
- * Mantiene solo las últimas 1000 mediciones en memoria. Cuando se alcanza el límite,
- * sobrescribe la línea más antigua (comportamiento de buffer circular).
- * 
- * @param iteration Número de iteración
- * @param t_espera_us Tiempo de espera del mutex (microsegundos)
- * @param t_ejec_us Tiempo de ejecución de la tarea (microsegundos)
- * @param t_total_us Tiempo total del ciclo (microsegundos)
- * @param periodo_us Período de muestreo configurado (microsegundos)
- * @param ts_real_us Período real medido entre iteraciones (microsegundos)
- * @param status Estado: "OK", "WARNING", "CRITICAL", "ERROR_MUTEX"
- * 
- * @version 1.0.6
- */
-void HiloPID::logTiming(int iteration, double t_espera_us, double t_ejec_us, 
-                        double t_total_us, double periodo_us, double ts_real_us, const char* status) {
-    double porcentaje_uso = (t_total_us / periodo_us) * 100.0;
-    double drift_us = ts_real_us - periodo_us;
-    double error_ts = (drift_us / periodo_us) * 100.0;
-    
-    // Construir línea en memoria
-    std::ostringstream line;
-    line << std::left << std::setw(10) << iteration
-         << std::setw(14) << std::fixed << std::setprecision(2) << t_espera_us
-         << std::setw(14) << std::fixed << std::setprecision(2) << t_ejec_us
-         << std::setw(14) << std::fixed << std::setprecision(2) << t_total_us
-         << std::setw(14) << std::fixed << std::setprecision(2) << periodo_us
-         << std::setw(14) << std::fixed << std::setprecision(2) << ts_real_us
-         << std::setw(14) << std::fixed << std::setprecision(2) << drift_us
-         << std::setw(12) << std::fixed << std::setprecision(2) << error_ts
-         << std::setw(10) << std::fixed << std::setprecision(2) << porcentaje_uso
-         << std::setw(12) << status << "\n";
-    
-    // Añadir al buffer circular (mantener solo últimas 1000 líneas)
-    if (log_buffer_.size() >= MAX_LOG_LINES) {
-        log_buffer_.pop_front();  // Eliminar la más antigua
-    }
-    log_buffer_.push_back(line.str());
-    
-    // Escribir al archivo cada 100 iteraciones para evitar I/O excesivo
-    if (iteration % 100 == 0) {
-        writeLogFile();
-    }
-}
-
-/**
- * @brief Escribe el contenido completo del buffer al archivo de log
- * 
- * Reescribe todo el archivo con el header y las líneas del buffer.
- * Llamado periódicamente (cada 100 iteraciones) y en el destructor.
- * 
- * @version 1.0.6
- */
-void HiloPID::writeLogFile() {
-    std::ofstream logfile(logfile_path_, std::ios::trunc);  // Sobrescribir archivo
-    if (logfile.is_open()) {
-        // Reescribir header
-        time_t now = time(nullptr);
-        struct tm* tm_info = localtime(&now);
-        char timestamp[32];
-        strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
-        
-        logfile << "HiloPID Runtime Performance Log\n";
-        logfile << "Frequency: " << frequency_ << " Hz\n";
-        logfile << "Sample Period: " << (1000000.0 / frequency_) << " us\n";
-        logfile << "Last Updated: " << timestamp << "\n";
-        logfile << "================================================================================\n";
-        logfile << std::left << std::setw(10) << "Iteration"
-                << std::setw(14) << "t_espera_us"
-                << std::setw(14) << "t_ejec_us"
-                << std::setw(14) << "t_total_us"
-                << std::setw(14) << "periodo_us"
-                << std::setw(14) << "Ts_Real_us"
-                << std::setw(14) << "drift_us"
-                << std::setw(12) << "%error_Ts"
-                << std::setw(10) << "%uso"
-                << std::setw(12) << "Status" << "\n";
-        logfile << "--------------------------------------------------------------------------------\n";
-        
-        // Escribir todas las líneas del buffer
-        for (const auto& line : log_buffer_) {
-            logfile << line;
-        }
-        
-        logfile.close();
-    }
 }
 
 } // namespace DiscreteSystems

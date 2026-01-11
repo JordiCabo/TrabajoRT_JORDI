@@ -17,11 +17,10 @@
 #include <memory>
 #include <atomic>
 #include <csignal>
-#include <deque>
-#include <string>
 #include "DiscreteSystem.h"
 #include "VariablesCompartidas.h"
 #include "ParametrosCompartidos.h"
+#include "RuntimeLogger.h"
 
 // Variable de control global para manejo de señales
 extern volatile sig_atomic_t g_signal_run;
@@ -76,16 +75,11 @@ private:
     double frequency_;
     pthread_t thread_;
     int iterations_;           // Contador de iteraciones
-    std::string logfile_path_;  // Ruta del archivo de log
-    std::deque<std::string> log_buffer_;  // Buffer circular de últimas 1000 líneas
-    static const int MAX_LOG_LINES = 1000; // Máximo de líneas en el log
     struct timespec t_prev_iteration_;  // Timestamp de la iteración anterior
+    RuntimeLogger logger_;      // Sistema de logging con buffer circular
 
     static void* threadFunc(void* arg);
     void run();
-    void logTiming(int iteration, double t_espera_us, double t_ejec_us,
-                   double t_total_us, double periodo_us, double ts_real_us, const char* status);
-    void writeLogFile();  // Escribe el buffer al archivo
 };
 
 } // namespace DiscreteSystems
