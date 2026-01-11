@@ -12,6 +12,8 @@
 #pragma once
 #include <pthread.h>
 #include <mutex>
+#include <memory>
+#include <atomic>
 #include <unistd.h>
 #include <csignal>
 #include "SignalGenerator.h"
@@ -50,25 +52,35 @@ namespace SignalGenerator {
 class HiloSignal {
 public:
     /**
-     * @brief Constructor que inicia la ejecución del hilo generador
+     * @brief Constructor con smart pointers (recomendado)
      * 
-     * @param signal Puntero al generador de señal (Step, Sine, PWM, etc.)
-     * @param output Puntero a la variable donde almacenar la salida generada
-     * @param running Puntero a variable booleana de control; cuando es false, el hilo se detiene
-     * @param mtx Puntero al mutex que protege las variables compartidas
-     * @param frequency Frecuencia de ejecución en Hz (período = 1/frequency)
+     * @param signal Smart pointer al generador de señal
+     * @param output Smart pointer a variable de salida
+     * @param running Smart pointer a variable booleana de control
+     * @param mtx Smart pointer al mutex que protege variables compartidas
+     * @param frequency Frecuencia de ejecución en Hz
+     */
+    HiloSignal(std::shared_ptr<Signal> signal, 
+               std::shared_ptr<double> output, 
+               std::shared_ptr<std::atomic<bool>> running,
+               std::shared_ptr<pthread_mutex_t> mtx, 
+               double frequency);
+
+    /**
+     * @brief Constructor con punteros crudos (compatibilidad)
+     * @deprecated Usar constructor con smart pointers en nuevo código
      * 
-     * @note El hilo comienza a ejecutarse inmediatamente desde el constructor
-     * @note El período de muestreo de la señal debe coincidir con 1/frequency
+     * @param signal Puntero al generador de señal
+     * @param output Puntero a variable de salida
+     * @param running Puntero a variable booleana de control
+     * @param mtx Puntero al mutex que protege variables compartidas
+     * @param frequency Frecuencia de ejecución en Hz
      */
     HiloSignal(Signal* signal, double* output, bool* running,
                pthread_mutex_t* mtx, double frequency);
 
     /**
      * @brief Destructor que espera a que termine el hilo
-     * 
-     * Ejecuta pthread_join() para asegurar que el hilo finaliza
-     * correctamente antes de destruir el objeto.
      */
     ~HiloSignal();
 
@@ -79,30 +91,22 @@ public:
     pthread_t getThread() const { return thread_; }
 
 private:
-    Signal* signal_;            ///< Puntero al generador de señal
-    double* output_;            ///< Puntero a variable de salida compartida
-    bool* running_;             ///< Puntero a variable de control de ejecución
-    pthread_mutex_t* mtx_;           ///< Puntero al mutex POSIX para sincronización
-    double frequency_;          ///< Frecuencia de ejecución en Hz
+    // Smart pointers (nueva interfaz)
+    std::shared_ptr<Signal> signal_;
+    std::shared_ptr<double> output_;
+    std::shared_ptr<std::atomic<bool>> running_;
+    std::shared_ptr<pthread_mutex_t> mtx_;
+    
+    // Punteros crudos (interfaz antigua, compatibilidad)
+    Signal* signal_raw_;
+    double* output_raw_;
+    bool* running_raw_;
+    pthread_mutex_t* mtx_raw_;
 
-    pthread_t thread_;          ///< Identificador del hilo pthread
+    double frequency_;
+    pthread_t thread_;
 
-    /**
-     * @brief Función estática de punto de entrada del hilo
-     * 
-     * @param arg Puntero a this (el objeto HiloSignal)
-     * @return nullptr
-     * 
-     * @note Esta es la función que pthread llama; internamente invoca run()
-     */
     static void* threadFunc(void* arg);
-
-    /**
-     * @brief Loop principal de ejecución del hilo
-     * 
-     * Ejecuta el generador de señal en bucle a la frecuencia especificada
-     * mientras *running_ sea true. Sincroniza la salida con el mutex.
-     */
     void run();
 };
 
