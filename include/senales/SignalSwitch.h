@@ -9,7 +9,9 @@
  */
 
 #pragma once
-#include "senales/SignalGenerator.h"
+#include "senales/StepSignal.h"
+#include "senales/SineSignal.h"
+#include "senales/PwmSignal.h"
 #include <memory>
 
 namespace SignalGenerator {

@@ -5,6 +5,25 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.9] - 2026-01-14
+
+### Refactorización
+- **Separación de clases Signal en headers individuales**:
+  - `SignalGenerator.h` (288 líneas) dividido en 5 archivos modulares:
+    - `include/senales/Signal.h` - Clase base abstracta
+    - `include/senales/StepSignal.h` - Señal escalón
+    - `include/senales/PwmSignal.h` - Señal PWM
+    - `include/senales/SineSignal.h` - Señal sinusoidal
+    - `include/senales/SignalMixer.h` - Mezclador de señales
+  - `SignalGenerator.h` mantiene compatibilidad como wrapper (incluye todos los headers)
+  - `SignalSwitch.h` actualizado para incluir headers específicos (StepSignal, SineSignal, PwmSignal)
+  - Beneficios:
+    - Mejor organización (Single Responsibility Principle)
+    - Compilación incremental más eficiente
+    - Navegación y mantenimiento más sencillo
+    - Consistente con el patrón del proyecto (un .h por clase)
+  - Validación: ✅ Compilación exitosa, ✅ Tests verificados (testStepSignal, testPID, testTF)
+
 ## [1.0.8.2] - 2026-01-14
 
 ### Añadido
