@@ -7,7 +7,7 @@
 
 #include "hilos/Hilo2in.h"
 #include "hilos/Hilo.h"
-#include "senales/Temporizador.h"
+#include "hilos/Temporizador.h"
 #include "config/system_config.h"
 #include <csignal>
 #include <iostream>

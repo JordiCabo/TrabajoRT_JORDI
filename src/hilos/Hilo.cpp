@@ -6,7 +6,7 @@
  */
 
 #include "hilos/Hilo.h"
-#include "senales/Temporizador.h"
+#include "hilos/Temporizador.h"
 
 namespace DiscreteSystems {
 

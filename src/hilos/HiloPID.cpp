@@ -9,7 +9,7 @@
 #include "hilos/HiloPID.h"
 #include "hilos/Hilo.h"
 #include "sistemas/PIDController.h"
-#include "senales/Temporizador.h"
+#include "hilos/Temporizador.h"
 #include <iostream>
 #include <iomanip>
 #include <sstream>

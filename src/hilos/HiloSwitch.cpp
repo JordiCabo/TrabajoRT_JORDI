@@ -9,7 +9,7 @@
 
 #include "hilos/HiloSwitch.h"
 #include "hilos/Hilo.h"
-#include "senales/Temporizador.h"
+#include "hilos/Temporizador.h"
 #include <iostream>
 #include <csignal>
 #include <stdexcept>

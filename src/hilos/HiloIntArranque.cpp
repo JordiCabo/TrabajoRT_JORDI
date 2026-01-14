@@ -1,6 +1,6 @@
 #include "hilos/HiloIntArranque.h"
 #include "hilos/Hilo.h"
-#include "senales/Temporizador.h"
+#include "hilos/Temporizador.h"
 #include <csignal>
 #include <iostream>
 #include <stdexcept>

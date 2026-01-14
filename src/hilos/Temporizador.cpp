@@ -5,7 +5,7 @@
  * @date 2026-01-10
  */
 
-#include "senales/Temporizador.h"
+#include "hilos/Temporizador.h"
 
 namespace DiscreteSystems {
 
@@ -52,3 +52,4 @@ void Temporizador::reiniciar() {
 }
 
 } // namespace DiscreteSystems
+
