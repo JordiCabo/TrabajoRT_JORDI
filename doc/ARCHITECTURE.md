@@ -40,9 +40,29 @@ Este documento describe la arquitectura de alto nivel del sistema de Control de 
 ### 1. Capa de Dominio (Core Library)
 
 **Ubicación**: `src/`, `include/`  
-**Namespace**: `DiscreteSystems`, `SignalGenerator`
+**Namespace**: `DiscreteSystems::`, `SignalGenerator::`
 
-Implementa la lógica de control y sistemas discretos:
+Implementa la lógica de control y sistemas discretos en carpetas temáticas:
+
+```
+include/
+├── sistemas/         ← DiscreteSystem, PIDController, TF, SS, Discretizer
+├── senales/          ← Signal, SignalGenerator, Temporizador
+├── hilos/            ← Hilo, Hilo2in, HiloPID, etc.
+├── converters/       ← ADConverter, DAConverter
+├── io/               ← Transmisor, Receptor
+├── utilidades/       ← RuntimeLogger, Sumador, etc.
+└── config/           ← system_config.h, comm.h, messages.h
+
+src/
+├── sistemas/         ← Implementaciones de sistemas discretos
+├── senales/          ← Implementaciones de generadores
+├── hilos/            ← Implementaciones de threading
+├── converters/       ← Implementaciones de conversores
+├── io/               ← Implementaciones de comunicación
+├── utilidades/       ← Implementaciones auxiliares
+└── config/           ← (archivos de configuración)
+```
 
 ```cpp
 DiscreteSystem (abstracta)
@@ -62,6 +82,8 @@ Signal (abstracta)
     └── PWMSignal
 ```
 
+**Ubicación de archivos**: Todos organizados en `include/sistemas/`, `include/senales/`, etc.
+
 **Responsabilidades**:
 - Implementar algoritmos de control discreto
 - Gestionar buffers circulares de muestras
@@ -71,7 +93,7 @@ Signal (abstracta)
 
 ### 2. Capa de Threading
 
-**Ubicación**: `include/Hilo*.h`, `src/Hilo*.cpp`
+**Ubicación**: `include/hilos/*.h`, `src/hilos/*.cpp`
 
 Wrappers para ejecución en tiempo real:
 
@@ -158,7 +180,15 @@ Este patrón se aplica análogamente en `Hilo` (1 entrada → 1 salida) y `HiloS
 - **Regiones críticas cortas**: leer/escribir bajo mutex y computar fuera.
 - **Sin deadlocks**: un único mutex compartido, sin bloqueos anidados.
 - **Jitter controlado**: el período se mantiene con `Temporizador` (`clock_nanosleep` con `TIMER_ABSTIME`), el tiempo bajo lock es mínimo.
-- **Terminación ordenada**: cada hilo verifica `running` bajo mutex y finaliza limpiamente (signal handler captura SIGINT/SIGTERM).
+- **Terminación ordenada**: implementada mediante bloqueo de señales (signal masking) en todos los hilos excepto `HiloIntArranque`:
+  - Función `bloquear_signals()`: bloquea SIGINT/SIGTERM en el hilo actual usando `pthread_sigmask(SIG_BLOCK)`
+  - Función `desbloquear_signals()`: desbloquea SIGINT/SIGTERM en el hilo actual usando `pthread_sigmask(SIG_UNBLOCK)`
+  - Flujo de terminación:
+    1. Usuario presiona Ctrl+C → SIGINT dispatched al proceso
+    2. Solo `HiloIntArranque` puede recibir SIGINT (otros tienen bloqueado)
+    3. `HiloIntArranque::manejador_signal()` establece `running=false` bajo mutex
+    4. Todos los demás hilos leen `running` en sus loops y terminan limpiamente
+  - Beneficio: previene terminación abrupta de otros threads antes de que `running` sea puesta a false
 - **Timedlock con timeout**: `HiloPID` usa timeout del 20% del período para evitar bloqueos indefinidos.
 
 ### Observaciones Operativas

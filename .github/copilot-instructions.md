@@ -22,7 +22,8 @@ Framework de control de sistemas en tiempo real desarrollado como Trabajo Final 
 
 ### Estructura de Build
 - **CMake Raíz** (`CMakeLists.txt`): Generación automática de tests desde archivos `test/*.cpp`
-  - Patrón glob crea ejecutable para cada archivo test
+  - Patrón `GLOB_RECURSE` recolecta archivos `.cpp` de `src/**/*.cpp` (subdirectorios temáticos)
+  - `target_include_directories()` añade todas las subcarpetas de `include/` (hilos, sistemas, senales, etc.)
   - Enlaza con librería estática `DiscreteSystems` + archivos `.a` en `lib/`
 - **CMake Interfaz_Control** (`Interfaz_Control/CMakeLists.txt`): Build separado Qt6, copia headers a `include/` raíz
   - Salida en `Interfaz_Control/bin/` (gui_app, control_simulator, test_send, test_receive)
@@ -64,14 +65,14 @@ cd Interfaz_Control && mkdir -p build && cd build && cmake .. && make
 
 ### Estándares de Código
 - Estándar C++17 (definido en CMakeLists)
-- Comentarios Doxygen para APIs públicas (ver `include/*.h`)
+- Comentarios Doxygen para APIs públicas (ver `include/**/*.h`)
 - Patrón NVI forzado: `next()` público no-virtual, `compute()` protegido virtual
 - Indentación con tabulaciones en headers, 4 espacios en implementación
 
 ### Patrón de Testing
 Crea nuevo test en `test/filename.cpp`:
 ```cpp
-#include "../include/PIDController.h"
+#include "sistemas/PIDController.h"
 #include <iostream>
 
 int main() {
@@ -93,20 +94,22 @@ int main() {
 
 | Archivo | Propósito |
 |---------|-----------|
-| `include/DiscreteSystem.h` | Clase base + patrón buffer circular |
-| `include/SignalGenerator.h` | API de composición de señales reutilizable |
-| `include/Hilo.h` | Wrapper de threading en tiempo real |
-| `include/RuntimeLogger.h` | Instrumentación diagnóstico (buffer circular, flush periódico) |
-| `include/system_config.h` | Configuración centralizada (SSOT): frecuencias, períodos, buffers |
-| `Interfaz_Control/src/comm.h` | Interfaz de serialización IPC |
-| `Interfaz_Control/src/messages.h` | Definiciones DataMessage/ParamsMessage |
-| `CMakeLists.txt` (raíz) | Auto-descubrimiento de tests |
+| `include/sistemas/DiscreteSystem.h` | Clase base + patrón buffer circular |
+| `include/senales/SignalGenerator.h` | API de composición de señales reutilizable |
+| `include/hilos/Hilo.h` | Wrapper de threading en tiempo real |
+| `include/utilidades/RuntimeLogger.h` | Instrumentación diagnóstico (buffer circular, flush periódico) |
+| `include/config/system_config.h` | Configuración centralizada (SSOT): frecuencias, períodos, buffers |
+| `include/config/comm.h` | Interfaz de serialización IPC |
+| `include/config/messages.h` | Definiciones DataMessage/ParamsMessage |
+| `CMakeLists.txt` (raíz) | Auto-descubrimiento de tests con GLOB_RECURSE |
 | `Interfaz_Control/CMakeLists.txt` | Build Qt6 + librería comm |
 
 ## Tareas Comunes
 
-- **Agregar nuevo sistema discreto**: Crea `include/NewSystem.h`, implementa en `src/NewSystem.cpp`, hereda de `DiscreteSystem`
-- **Agregar feature GUI**: Modifica `Interfaz_Control/src/mainwindow.cpp`; actualiza `messages.h` si se necesitan nuevos parámetros
+- **Agregar nuevo sistema discreto**: Crea `include/sistemas/NewSystem.h`, implementa en `src/sistemas/NewSystem.cpp`, hereda de `DiscreteSystem`
+- **Agregar nuevo hilo**: Crea `include/hilos/HiloNewType.h`, implementa en `src/hilos/HiloNewType.cpp`
+- **Agregar nueva señal**: Crea clase en `include/senales/` y `src/senales/`, hereda de `Signal`
+- **Agregar feature GUI**: Modifica `Interfaz_Control/src/mainwindow.cpp`; actualiza `config/messages.h` si se necesitan nuevos parámetros
 - **Debug IPC**: Ejecuta `Interfaz_Control/bin/test_send` y `test_receive` independientemente para aislar comunicación
 - **Profile de performance**: Buffer circular previene asignaciones en hot loop (`DiscreteSystem::next()`)
 

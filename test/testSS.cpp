@@ -1,5 +1,5 @@
 #include <iostream>
-#include "StateSpaceSystem.h"
+#include "sistemas/StateSpaceSystem.h"
 
 void printOctave() {
     double tau = 0.3;

@@ -1,5 +1,5 @@
 #include <iostream>
-#include "TransferFunctionSystem.h"
+#include "sistemas/TransferFunctionSystem.h"
 
 void printOctave() {
 

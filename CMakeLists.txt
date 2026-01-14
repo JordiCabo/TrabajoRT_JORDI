@@ -13,9 +13,18 @@ file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 file(MAKE_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 
 # ---- Librería estática de tus .cpp ----
-file(GLOB LIB_SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp")
+file(GLOB_RECURSE LIB_SOURCES "${CMAKE_SOURCE_DIR}/src/**/*.cpp")
 add_library(DiscreteSystems STATIC ${LIB_SOURCES})
-target_include_directories(DiscreteSystems PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(DiscreteSystems PUBLIC 
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include/hilos
+    ${CMAKE_SOURCE_DIR}/include/sistemas
+    ${CMAKE_SOURCE_DIR}/include/senales
+    ${CMAKE_SOURCE_DIR}/include/converters
+    ${CMAKE_SOURCE_DIR}/include/io
+    ${CMAKE_SOURCE_DIR}/include/utilidades
+    ${CMAKE_SOURCE_DIR}/include/config
+)
 
 # ---- Librerías estáticas externas (.a) ----
 file(GLOB ALL_STATIC_LIBS "${CMAKE_SOURCE_DIR}/lib/*.a")

@@ -5,12 +5,90 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.8.2] - 2026-01-14
+
+### Añadido
+- **Thread Closure Diagnostics Mejorados**:
+  - Todos los 8 tipos de hilo ahora imprimen mensajes de cierre con identificación
+  - Formato: `{nombre_hilo}: Cerrado correctamente` (e.g., "hiloPID: Cerrado correctamente", "Transmisor: Cerrado correctamente")
+  - Implementación:
+    - Agregado miembro `std::string name_` a todas las clases Hilo para almacenar identificador
+    - Actualizado todas las estructuras de inicialización en constructores
+    - Actualizado destructores para usar `name_` en mensajes de cierre
+    - Parámetro `log_prefix` existente reutilizado para identificación (HiloPID, HiloSignal, HiloSwitch, HiloIntArranque)
+    - Nuevo parámetro `log_prefix` con default ("Transmisor"/"Receptor") para HiloTransmisor/HiloReceptor
+  - Beneficio: Diagnóstico inmediato de cuáles threads se cerraron correctamente en orden
+  - Archivos modificados:
+    - Headers: Agregado `#include <string>` (HiloPID) + `std::string name_` member en todas
+    - Implementaciones: Inicialización `name_(log_prefix)` + actualización destructores
+  - Validación: ✅ Compilación exitosa, ✅ Todos los 11 threads imprimen cierre correctamente
+
+### Arreglado (previo v1.0.8.1)
+- **Segmentation fault en Ctrl+C**: Problema de double `pthread_join()`
+  - Causa: main() hacía `pthread_join()` manual, pero destructores también lo hacían
+  - Solución: Remover `pthread_join()` manuales (RAII lo maneja automáticamente)
+  - Resultado: Terminación 100% limpia sin segfault
+
+## [1.0.8.1] - 2026-01-14
+
+### Arreglado
+- **Segmentation fault en Ctrl+C**: Problema de double `pthread_join()` en testHilo.cpp
+  - Causa: main() hacía `pthread_join()` manual, pero destructores también lo hacían
+  - Solución: Remover `pthread_join()` manuales (RAII lo maneja automáticamente)
+  - Resultado: Terminación 100% limpia sin segfault
+  - Archivo: `test/testHilo.cpp` (removidas líneas 301-308)
+
+### Técnico
+- ✅ Compilación: 100% exitosa
+- ✅ Runtime: Validado con `timeout + pkill -SIGINT`
+- ✅ Exit behavior: Transmisor/Receptor se cierran, no hay segmentation fault
+- ✅ Documentación: SEGFAULT_FIX.md explica causa y solución
+
+## [1.0.8] - 2026-01-14
+
+### Añadido
+- **Signal Handling Mejorado**:
+  - Funciones `bloquear_signals()` y `desbloquear_signals()` en `hilos/Hilo.cpp`
+  - Bloqueo de SIGINT/SIGTERM en todos los hilos excepto HiloIntArranque usando `pthread_sigmask()`
+  - HiloIntArranque desbloquea señales en `run()` para ser el único receptor
+  - Garantiza terminación controlada: cuando se presiona Ctrl+C, solo HiloIntArranque recibe la señal, pone `running=false`, y otros hilos terminan limpiamente leyendo esta variable
+
+### Técnico
+- ✅ Compilación: 100% exitosa (14 tests compilados)
+- ✅ Runtime: Validado con testHilo - all threads running correctly
+- ✅ Signal Safety: POSIX-compliant `pthread_sigmask()` en lugar de `sigprocmask()`
+
+## [1.0.7] - 2026-01-14
+
+### Añadido
+- **Reorganización en carpetas temáticas**:
+  - Nueva estructura para `include/` y `src/`:
+    - `hilos/`: Clases de threading (Hilo.h, Hilo2in.h, HiloPID.h, etc.)
+    - `sistemas/`: Sistemas discretos (DiscreteSystem.h, PIDController.h, TF, SS)
+    - `senales/`: Generadores de señal (SignalGenerator.h, SignalSwitch.h, Temporizador.h)
+    - `converters/`: Conversores AD/DA (ADConverter.h, DAConverter.h)
+    - `io/`: Comunicación (Transmisor.h, Receptor.h)
+    - `utilidades/`: Componentes auxiliares (RuntimeLogger.h, Sumador.h, etc.)
+    - `config/`: Configuración centralizada (system_config.h, comm.h, messages.h, etc.)
+
+### Cambiado
+- **CMakeLists.txt**: Actualizado para usar `GLOB_RECURSE` en `src/**/*.cpp`
+- **Include paths**: Actualizado `target_include_directories()` con todas las subcarpetas
+- **Todos los includes**: Actualizados a rutas relativas ("sistemas/PIDController.h")
+- **Documentación**: Sincronizada con nueva estructura temática
+
+### Técnico
+- ✅ Compilación: 100% exitosa con nueva estructura
+- ✅ Tests: Todos los 14 tests compilados y ejecutados
+- ✅ Compatibilidad: Ningún cambio en la API pública
+- ✅ Performance: Sin impacto (solo reorganización de archivos)
+
 ## [1.0.6] - 2026-01-11
 
 ### Añadido
 - **RuntimeLogger completo**: Sistema de logging con buffer circular de 1000 líneas para métricas de tiempo real:
   - Parámetros `log_prefix` y `frequency` obligatorios en todos los constructores de hilos.
-  - Métodos `initializeHilo()` y `initializeHiloPID()` para configuración de columnas.
+  - Métodos `initializeHilo()` e `initializeHiloPID()` para configuración de columnas.
   - Flush automático cada 100 líneas sin impacto I/O excesivo.
   - Archivos log: `logs/{prefix}_runtime_YYYYMMDD_HHMMSS.txt`.
   - Métricas capturadas: iteration, t_espera_us, t_ejec_us, t_total_us, periodo_us, Ts_Real_us, drift_us, %error_Ts, %uso, status (OK/WARNING/CRITICAL).
@@ -24,9 +102,23 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Captura SIGINT/SIGTERM para parada controlada de todos los hilos.
   - Evita errores pthread_join al detener threads limpiamente.
 - **Configuración centralizada (SSOT)**:
-  - Nuevo archivo `include/system_config.h` con namespace `SystemConfig`.
+  - Nuevo archivo `include/config/system_config.h` con namespace `SystemConfig`.
   - Constantes constexpr: TS_CONTROLLER, FREQ_COMPONENT, FREQ_COMMUNICATION, BUFFER_SIZE_LOGGER, etc.
   - Single Source of Truth para frecuencias, períodos, buffers y timeouts.
+
+### Cambiado
+- **Logs selectivos**: RuntimeLogger solo en hilos de control (Hilo, Hilo2in/Sumador, HiloPID, HiloSwitch, HiloSignal, HiloIntArranque); removido de hilos de comunicación IPC (HiloTransmisor, HiloReceptor) para reducir overhead.
+- **Frecuencia IPC optimizada**: `freq_communication` reducida a 10 Hz (100ms) desde valores previos variables para balance entre responsividad GUI y overhead del sistema.
+- **testHilo.cpp**: Actualizado para usar `SystemConfig::TS_CONTROLLER` y constantes centralizadas; añadido signal handler global.
+
+### Técnico
+- **Evidencia de estabilidad** (logs de producción):
+  - Tiempos de espera mutex: < 2 μs (insignificante)
+  - %uso del período: < 0.03% (margen 99.97%)
+  - Error de período: < 0.87% (jitter ±0.6%)
+  - 0 eventos WARNING/CRITICAL en ejecuciones completas
+  - Timedlock timeout nunca disparado (configurado al 20%)
+- **Contención de mutex**: No observada en logs; mutex único compartido es suficiente para la carga actual.
 
 ### Cambiado
 - **Logs selectivos**: RuntimeLogger solo en hilos de control (Hilo, Hilo2in/Sumador, HiloPID, HiloSwitch, HiloSignal, HiloIntArranque); removido de hilos de comunicación IPC (HiloTransmisor, HiloReceptor) para reducir overhead.

@@ -56,15 +56,22 @@ cd build && cmake .. && make
 
 ```
 PL7/
-├── include/                    # Headers (.h)
-│   ├── Hilo*.h                # Clases de threading
-│   ├── *Converter.h           # AD/DA converters
-│   ├── PIDController.h        # Controlador PID
-│   └── ...
-├── src/                        # Implementación (.cpp)
-│   ├── Hilo*.cpp
-│   ├── *Converter.cpp
-│   └── ...
+├── include/                    # Headers (.h) organizados temáticamente
+│   ├── hilos/                 # Clases de threading (Hilo*.h)
+│   ├── sistemas/              # Sistemas discretos (PIDController.h, TF, SS)
+│   ├── senales/               # Generadores de señal
+│   ├── converters/            # Conversores AD/DA
+│   ├── io/                    # Comunicación (Transmisor, Receptor)
+│   ├── utilidades/            # Componentes auxiliares
+│   └── config/                # Configuración centralizada
+├── src/                        # Implementación (.cpp) con misma estructura
+│   ├── hilos/
+│   ├── sistemas/
+│   ├── senales/
+│   ├── converters/
+│   ├── io/
+│   ├── utilidades/
+│   └── config/
 ├── test/                       # Tests unitarios
 │   ├── testHilo.cpp           # Test integración completa
 │   ├── testPID.cpp

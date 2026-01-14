@@ -196,23 +196,24 @@ HiloTransmisor hilo_tx(&transmisor, &running, &mtx, 50);                   // En
 
 ## Características de Tiempo Real
 
-- Ejecución pthread a frecuencia fija (Hz definida en `system_config.h`)
+- Ejecución pthread a frecuencia fija (Hz definida en `config/system_config.h`)
 - Sincronización con `std::mutex`, `std::lock_guard` y `pthread_mutex_timedlock` (timeout 20% período)
 - Temporización absoluta con `Temporizador` para eliminar drift (`clock_nanosleep` + `TIMER_ABSTIME`)
 - **RuntimeLogger** con buffer circular para diagnóstico en tiempo real (solo hilos de control)
 - Signal handler (SIGINT/SIGTERM) para parada limpia sin errores pthread_join
 - Error logging centralizado: stderr redirigido a `logs/error_log_YYYYMMDD_HHMMSS.txt`
-- Configuración centralizada (SSOT) en `system_config.h`: frecuencias, períodos, buffers
+- Configuración centralizada (SSOT) en `config/system_config.h`: frecuencias, períodos, buffers
 - Buffer circular para evitar asignaciones dinámicas
 - Variables compartidas protegidas en todo momento
+- Código organizado en carpetas temáticas (`hilos/`, `sistemas/`, `senales/`, `converters/`, `io/`, `utilidades/`, `config/`)
 
 ## Uso Rápido
 
 Ver ejemplos detallados en cada clase. Para comenzar:
 
 ```cpp
-#include "PIDController.h"
-#include "TransferFunctionSystem.h"
+#include "sistemas/PIDController.h"
+#include "sistemas/TransferFunctionSystem.h"
 
 // Ver clase PIDController para ejemplo completo
 ```
@@ -221,7 +222,7 @@ Ver ejemplos detallados en cada clase. Para comenzar:
 
 - Ver jerarquía de clases en el menú "Classes"
 - Buscar funciones específicas en "Class Members"
-- Revisar archivos fuente en "Files"
+- Revisar archivos fuente en "Files" (organizados por carpeta temática)
 - Consultar ejemplos en las páginas de cada clase
 
 ---

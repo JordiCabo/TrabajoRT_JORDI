@@ -21,7 +21,7 @@
  * Compilar: cmake --build build --target test_send
  */
 
-#include "comm.h"
+#include "config/comm.h"
 #include <iostream>
 #include <unistd.h>
 #include <ctime>

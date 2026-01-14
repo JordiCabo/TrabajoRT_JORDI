@@ -8,10 +8,10 @@
 #include <iostream>
 #include <memory>
 #include <unistd.h>
-#include "../include/PIDController.h"
-#include "../include/HiloPID.h"
-#include "../include/VariablesCompartidas.h"
-#include "../include/ParametrosCompartidos.h"
+#include "sistemas/PIDController.h"
+#include "hilos/HiloPID.h"
+#include "utilidades/VariablesCompartidas.h"
+#include "utilidades/ParametrosCompartidos.h"
 
 int main() {
     using namespace DiscreteSystems;

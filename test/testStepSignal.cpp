@@ -1,5 +1,5 @@
 #include <iostream>
-#include "SignalGenerator.h"
+#include "senales/SignalGenerator.h"
 
 int main() {
     using namespace SignalGenerator;

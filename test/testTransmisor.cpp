@@ -18,8 +18,8 @@
  * Compilar: cd build && cmake .. && make testTransmisor
  */
 
-#include "Transmisor.h"
-#include "VariablesCompartidas.h"
+#include "io/Transmisor.h"
+#include "utilidades/VariablesCompartidas.h"
 #include <iostream>
 #include <unistd.h>
 #include <cmath>

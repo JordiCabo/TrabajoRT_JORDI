@@ -22,7 +22,7 @@
  * Compilar: cmake --build build --target test_receive
  */
 
-#include "comm.h"
+#include "config/comm.h"
 #include <iostream>
 #include <unistd.h>
 

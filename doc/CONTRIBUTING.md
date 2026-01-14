@@ -223,11 +223,11 @@ private:
 
 ### Configuración Centralizada
 
-**IMPORTANTE**: Todas las frecuencias, períodos y tamaños de buffer deben definirse en `include/system_config.h`:
+**IMPORTANTE**: Todas las frecuencias, períodos y tamaños de buffer deben definirse en `include/config/system_config.h`:
 
 ```cpp
 // ✅ CORRECTO: Usar constantes de system_config.h
-#include "system_config.h"
+#include "config/system_config.h"
 double ts = SystemConfig::TS_CONTROLLER;
 double freq = SystemConfig::FREQ_COMMUNICATION;
 size_t buffer_size = SystemConfig::BUFFER_SIZE_LOGGER;
@@ -237,7 +237,38 @@ double ts = 0.01;  // NO - usar SystemConfig::TS_CONTROLLER
 double freq = 50.0;  // NO - usar SystemConfig::FREQ_COMMUNICATION
 ```
 
-**Single Source of Truth (SSOT)**: `system_config.h` es el único lugar para definir configuración del sistema.
+**Single Source of Truth (SSOT)**: `config/system_config.h` es el único lugar para definir configuración del sistema.
+
+### Añadir un Nuevo Componente
+
+**Paso 1: Crear header en carpeta temática**
+```bash
+# Ejemplo: Nuevo sistema discreto
+touch include/sistemas/MyNewSystem.h
+```
+
+**Paso 2: Crear implementación en carpeta temática**
+```bash
+touch src/sistemas/MyNewSystem.cpp
+```
+
+**Paso 3: Usar includes con rutas relativas**
+```cpp
+// En include/sistemas/MyNewSystem.h
+#include "sistemas/DiscreteSystem.h"
+
+// En src/sistemas/MyNewSystem.cpp
+#include "sistemas/MyNewSystem.h"
+```
+
+**Paso 4: Crear test**
+```bash
+touch test/testMyNewSystem.cpp
+```
+
+**Paso 5: CMake detectará automáticamente**
+- Los archivos .cpp en `src/**/*.cpp` se compilarán automáticamente
+- Los tests en `test/*.cpp` se crearán como ejecutables
 
 ### Patrón NVI
 
