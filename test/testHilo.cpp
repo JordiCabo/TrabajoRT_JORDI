@@ -322,9 +322,8 @@ int main() {
     // Si hiciéramos pthread_join() aquí Y en el destructor, sería double-join
     // que causa segmentation fault.
     
-    // Cerrar transmisor y receptor
-    transmisor->cerrar();
-    receptor->cerrar();
+    // Transmisor y receptor se cierran automáticamente en sus destructores
+    // (no llamar cerrar() manualmente para evitar duplicación de mensajes)
     
     // Destructor mutex
     pthread_mutex_destroy(mtx.get());

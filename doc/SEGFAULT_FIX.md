@@ -49,9 +49,11 @@ Hilo::~Hilo() {
 
 5. Llamar `pthread_join()` en un thread que ya fue joined causa **undefined behavior** → **segmentation fault**
 
-## Solución Implementada
+## Solución Implementada (v1.0.8.1 + v1.0.10)
 
-Simplemente **remover todos los `pthread_join()` manuales** en testHilo.cpp. El destructor ya se encarga:
+### v1.0.8.1: Remover `pthread_join()` manuales en testHilo.cpp
+
+Simplemente **remover todos los `pthread_join()` manuales**. El destructor ya se encarga:
 
 ```cpp
 // En testHilo.cpp (CORRECTO)
@@ -60,18 +62,31 @@ pthread_mutex_lock(mtx.get());
 *running = false;
 pthread_mutex_unlock(mtx.get());
 
-// ... (no hay pthread_join() manual)
-
-// Los destructores automáticos se encargan de pthread_join()
-// cuando los objetos salen del scope al final de main()
-
-// Cerrar transmisor y receptor
-transmisor->cerrar();
-receptor->cerrar();
+// Los threads se limpian automáticamente cuando los objetos salen del scope.
+// NO hacer pthread_join() manual para evitar double-join que causa segfault.
 
 // Destructor mutex
 pthread_mutex_destroy(mtx.get());
 
+return 0;
+```
+
+### v1.0.10: Remover llamadas redundantes y actualizar testSystem.cpp
+
+**Cambios adicionales**:
+1. **Removidas llamadas manuales a `cerrar()`**: Los destructores de Transmisor/Receptor ya llaman a `cerrar()` automáticamente
+2. **testSystem.cpp también corregido**: Tenía el mismo problema de `pthread_join()` manual (líneas 320-323)
+3. **Mensajes de cierre clarificados**:
+   - `HiloTransmisor`/`HiloReceptor`: "Hilo X: Cerrado correctamente" (pthread_join)
+   - `Transmisor`/`Receptor`: "Cola X: Cerrado correctamente" (mqueue close)
+
+```cpp
+// testSystem.cpp (v1.0.10 - CORRECTO)
+// Los threads se limpian automáticamente cuando los objetos salen del scope.
+// NO hacer pthread_join() manual para evitar double-join que causa segfault.
+// Transmisor y receptor se cierran automáticamente en sus destructores.
+
+pthread_mutex_destroy(mtx.get());
 return 0;
 ```
 
@@ -201,19 +216,37 @@ cd build && make -j4
 ./bin/testPID       ✓
 ./bin/testTF        ✓
 ./bin/testSS        ✓
-./bin/testSystem    ✓
-./bin/testHilo      ✓ (ahora sin segfault)
+./bin/testSystem    ✓ (v1.0.10: corregido double-join)
+./bin/testHilo      ✓ (v1.0.8.1: sin segfault, v1.0.10: mensajes clarificados)
 ```
 
-## Impacto en v1.0.9
+## Salida de Cierre Esperada (v1.0.10)
+
+```
+Hilo Receptor: Cerrado correctamente      ← pthread_join del wrapper
+Cola Receptor: Cerrado correctamente      ← mqueue close del objeto IPC
+Hilo Transmisor: Cerrado correctamente    ← pthread_join del wrapper
+Cola Transmisor: Cerrado correctamente    ← mqueue close del objeto IPC
+Sumador: Cerrado correctamente
+hiloDA: Cerrado correctamente
+hiloPID: Cerrado correctamente
+hiloAD: Cerrado correctamente
+hiloPlanta: Cerrado correctamente
+hiloRef: Cerrado correctamente
+hiloInterruptor: Cerrado correctamente
+```
+
+## Impacto en v1.0.9 y v1.0.10
 
 - **Signal Handling (v1.0.8)**: Ya funcionaba correctamente
 - **Cleanup Fix (v1.0.8.1)**: Completa el ciclo de vida correcto
-- **Resultado**: Terminación **100% ordenada y limpia** con Ctrl+C
+- **Signal Refactoring (v1.0.9)**: Separación modular de headers
+- **Closure Clarity (v1.0.10)**: Mensajes diferenciados para thread vs IPC queue
+- **Resultado**: Terminación **100% ordenada y limpia** con Ctrl+C, mensajes de diagnóstico claros
 
 ---
 
-**Versión**: 1.0.8.1  
+**Versión**: 1.0.8.1 → 1.0.10  
 **Fecha**: 2026-01-14  
-**Issue**: Segmentation fault en Ctrl+C  
+**Issue**: Segmentation fault en Ctrl+C + Mensajes duplicados confusos  
 **Status**: ✅ FIXED

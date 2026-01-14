@@ -5,6 +5,24 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.10] - 2026-01-14
+
+### Arreglado
+- **Mensajes de cierre duplicados clarificados**:
+  - Problema: Transmisor/Receptor aparecían duplicados en logs de cierre
+  - Causa: Destructor del hilo (pthread_join) + destructor del objeto IPC (mqueue close) usaban el mismo mensaje
+  - Solución implementada:
+    - `HiloTransmisor`/`HiloReceptor` destructores: "Hilo X: Cerrado correctamente"
+    - `Transmisor`/`Receptor` objetos (mqueue): "Cola X: Cerrado correctamente"
+  - Resultado: Ahora es claro que hay dos cierres necesarios y correctos (thread + cola IPC)
+  
+- **Eliminadas llamadas redundantes en tests**:
+  - Removidas llamadas manuales a `transmisor->cerrar()` y `receptor->cerrar()` en testHilo.cpp y testSystem.cpp
+  - Los destructores automáticos manejan el cierre correctamente (RAII)
+  - testSystem.cpp: Removidos `pthread_join()` manuales para evitar double-join
+  
+- Validación: ✅ testHilo ejecuta y cierra limpiamente sin confusión en mensajes
+
 ## [1.0.9] - 2026-01-14
 
 ### Refactorización

@@ -79,6 +79,6 @@ void Receptor::cerrar() {
         comm_->closeQueues();
         comm_.reset();
         inicializado_ = false;
-        std::cout << "Receptor: Cerrado correctamente" << std::endl;
+        std::cout << "Cola Receptor: Cerrado correctamente" << std::endl;
     }
 }

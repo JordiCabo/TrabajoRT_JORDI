@@ -89,7 +89,7 @@ void Transmisor::cerrar() {
         comm_->closeQueues();
         comm_.reset();
         inicializado_ = false;
-        std::cout << "Transmisor: Cerrado correctamente" << std::endl;
+        std::cout << "Cola Transmisor: Cerrado correctamente" << std::endl;
     }
 }
 

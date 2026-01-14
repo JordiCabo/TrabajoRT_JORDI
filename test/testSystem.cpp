@@ -317,14 +317,9 @@ int main() {
     pthread_join(hiloPlanta.getThread(), nullptr);
     pthread_join(hiloAD.getThread(), nullptr);
     pthread_join(hiloPID.getThread(), nullptr);
-    pthread_join(hiloDA.getThread(), nullptr);
-    pthread_join(hiloSumador.getThread(), nullptr);
-    pthread_join(hiloTransmisor.getThread(), nullptr);
-    pthread_join(hiloReceptor.getThread(), nullptr);
-
-    // Cerrar transmisor y receptor
-    transmisor->cerrar();
-    receptor->cerrar();
+    // Los threads se limpian automáticamente cuando los objetos salen del scope.
+    // NO hacer pthread_join() manual para evitar double-join que causa segfault.
+    // Transmisor y receptor se cierran automáticamente en sus destructores.
     
     // Destructor mutex
     pthread_mutex_destroy(mtx.get());

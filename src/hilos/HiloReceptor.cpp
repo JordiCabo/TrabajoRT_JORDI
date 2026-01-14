@@ -58,7 +58,7 @@ HiloReceptor::~HiloReceptor() {
     if (ret != 0) {
         std::cerr << "[HiloReceptor] Error: pthread_join falló con código " << ret << std::endl;
     } else {
-        std::cout << name_ << ": Cerrado correctamente" << std::endl;
+        std::cout << "Hilo " << name_ << ": Cerrado correctamente" << std::endl;
     }
 }
 
