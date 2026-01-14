@@ -26,17 +26,17 @@ target_include_directories(DiscreteSystems PUBLIC
     ${CMAKE_SOURCE_DIR}/include/config
 )
 
-# ---- Librerías estáticas externas (.a) ----
+# Enlazar librerías externas a DiscreteSystems (para que Receptor, Transmisor, etc. encuentren los símbolos)
 file(GLOB ALL_STATIC_LIBS "${CMAKE_SOURCE_DIR}/lib/*.a")
-
 foreach(LIBFILE ${ALL_STATIC_LIBS})
     get_filename_component(LIBNAME ${LIBFILE} NAME_WE)
-
     add_library(${LIBNAME} STATIC IMPORTED)
     set_target_properties(${LIBNAME} PROPERTIES
         IMPORTED_LOCATION ${LIBFILE}
     )
+    target_link_libraries(DiscreteSystems PUBLIC ${LIBNAME})
 endforeach()
+
 
 # ---- Buscar todos los .cpp de test/ ----
 file(GLOB TEST_SOURCES "${CMAKE_SOURCE_DIR}/test/*.cpp")

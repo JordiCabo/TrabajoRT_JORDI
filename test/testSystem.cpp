@@ -308,18 +308,22 @@ int main() {
     vars->running = false;
     pthread_mutex_unlock(&vars->mtx);
 
-   
+    // Esperar un poco para que los threads lean running=false y terminen
+    // Los destructores se encargarán de pthread_join()
+    sleep(1);
 
     //-------------------------------------------------------------
-    // ------- Esperar terminación de todos los hilos -------------
+    // ------- Destructores de threads: cleanup automático --------
     //-------------------------------------------------------------
-    pthread_join(hiloRef.getThread(), nullptr);
-    pthread_join(hiloPlanta.getThread(), nullptr);
-    pthread_join(hiloAD.getThread(), nullptr);
-    pthread_join(hiloPID.getThread(), nullptr);
+    // IMPORTANTE: Los destructores de Hilo, HiloSignal, etc. ya hacen
+    // pthread_join() automáticamente, por lo que NO hacer join manual aquí.
     // Los threads se limpian automáticamente cuando los objetos salen del scope.
-    // NO hacer pthread_join() manual para evitar double-join que causa segfault.
-    // Transmisor y receptor se cierran automáticamente en sus destructores.
+    //
+    // Si hiciéramos pthread_join() aquí Y en el destructor, sería double-join
+    // que causa segmentation fault.
+    
+    // Transmisor y receptor se cierran automáticamente en sus destructores
+    // (no llamar cerrar() manualmente para evitar duplicación de mensajes)
     
     // Destructor mutex
     pthread_mutex_destroy(mtx.get());
