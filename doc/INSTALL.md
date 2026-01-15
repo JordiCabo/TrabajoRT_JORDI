@@ -1,6 +1,27 @@
+
 # Guía de Instalación
 
 Guía detallada de instalación para PL7 Control de Sistemas Discretos en diferentes plataformas.
+
+## 🚀 Primeros Pasos tras la Instalación
+
+1. Compila el proyecto:
+    ```bash
+    cd build
+    cmake .. && make
+    ```
+2. Ejecuta un test básico para verificar la instalación:
+    ```bash
+    ./bin/testPID
+    ```
+    Si ves resultados numéricos o logs, la instalación es correcta.
+3. Consulta la documentación en `doc/` y la API Doxygen en `doc/doxygen/html/index.html`.
+
+---
+
+**Nota sobre WSL y entornos virtualizados:**
+El proyecto funciona en WSL2 y máquinas virtuales Linux siempre que estén instaladas las dependencias y habilitado el soporte de pthread/IPC. El rendimiento puede variar respecto a hardware nativo.
+
 
 ## 📋 Tabla de Contenidos
 

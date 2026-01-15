@@ -10,6 +10,9 @@
 
 #pragma once
 #include <pthread.h>
+#include <iostream>
+#include <vector>
+#include <string>
 
 /**
  * @class VariablesCompartidas
@@ -83,4 +86,50 @@ public:
     /// }
     /// @endcode
     pthread_mutex_t mtx;
+    
+    /**
+     * @brief Sobrecarga del operador << para impresión formateada de variables del sistema
+     * 
+     * Permite usar `std::cout << vars` para imprimir el estado del lazo:
+     * k=N | Ref=X | e=X | u=X | yk=X | ykd=X
+     * 
+     * @param os Stream de salida
+     * @param vars Variables compartidas a imprimir
+     * @return Referencia al stream para encadenamiento
+     */
+    friend std::ostream& operator<<(std::ostream& os, const VariablesCompartidas& vars);
+    
+    // ========================================
+    // Buffer para grabación en fichero
+    // ========================================
+    
+    /**
+     * @brief Guarda una muestra en el buffer de memoria (operación O(1), real-time safe)
+     * @param k Número de iteración
+     * @param linea Texto de la línea a guardar
+     * @note Llamar durante ejecución en tiempo real (no bloquea)
+     */
+    void guardarMuestraEnBuffer(int k, const std::string& linea);
+    
+    /**
+     * @brief Escribe todo el buffer a disco (llamar DESPUÉS de terminar, no en tiempo real)
+     * @param filename Ruta del fichero donde guardar
+     * @return true si se escribió correctamente
+     */
+    bool escribirBufferADisco(const std::string& filename);
+    
+    /**
+     * @brief Limpia el buffer de muestras
+     */
+    void limpiarBuffer();
+    
+    /**
+     * @brief Retorna el número de muestras guardadas en buffer
+     */
+    size_t obtenerTamanoBuffer() const;
+    
+private:
+    /// Buffer para almacenar las muestras (máximo 1000)
+    std::vector<std::string> buffer_muestras;
+    static constexpr size_t MAX_MUESTRAS = 1000;
 };

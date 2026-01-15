@@ -28,6 +28,34 @@
 namespace SystemConfig {
 
 //-------------------------------------------------------------
+// Parámetros PID
+//-------------------------------------------------------------
+constexpr double PID_KP = 5.0;
+constexpr double PID_KI = 3.0;
+constexpr double PID_KD = 0.7;
+constexpr double PID_SETPOINT = 1.0;
+
+//-------------------------------------------------------------
+// Parámetros Planta
+//-------------------------------------------------------------
+constexpr double PLANTA_TAU = 1.0;
+constexpr double PLANTA_NUM_S[] = {1.0};
+constexpr double PLANTA_DEN_S[] = {1.0, 1.0};
+
+//-------------------------------------------------------------
+// Parámetros Señales
+//-------------------------------------------------------------
+constexpr double SIGNAL_AMPLITUDE = 1.0;
+constexpr double SIGNAL_STEP_TIME = 0.05;
+constexpr double SIGNAL_OFFSET = 0.0;
+constexpr double SIGNAL_SIN_FREQ = 1.0;
+constexpr double SIGNAL_SIN_PHASE = 0.0;
+constexpr double SIGNAL_SIN_AMP = 10.0;
+constexpr double SIGNAL_PWM_DUTY = 0.5;
+constexpr double SIGNAL_PWM_PERIOD = 1.0;
+constexpr int SIGNAL_INITIAL_TYPE = 0; // 0=step, 1=pwm, 2=sine
+
+//-------------------------------------------------------------
 // Frecuencias y Períodos de Muestreo
 //-------------------------------------------------------------
 
@@ -74,6 +102,19 @@ constexpr double WARNING_THRESHOLD = 0.9;
 
 /// Umbral CRITICAL de uso del período (1.0 = 100%)
 constexpr double CRITICAL_THRESHOLD = 1.0;
+
+//-------------------------------------------------------------
+// Nombres de hilos (para logging, identificación, etc.)
+//-------------------------------------------------------------
+constexpr const char* HILO_REF_NAME         = "hiloRef";
+constexpr const char* HILO_PLANTA_NAME      = "hiloPlanta";
+constexpr const char* HILO_AD_NAME          = "hiloAD";
+constexpr const char* HILO_DA_NAME          = "hiloDA";
+constexpr const char* HILO_PID_NAME         = "hiloPID";
+constexpr const char* HILO_SUMADOR_NAME     = "Sumador";
+constexpr const char* HILO_TRANSMISOR_NAME  = "hiloTransmisor";
+constexpr const char* HILO_RECEPTOR_NAME    = "hiloReceptor";
+constexpr const char* HILO_INTERRUPT_NAME   = "hiloInterruptor";
 
 } // namespace SystemConfig
 

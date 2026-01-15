@@ -1,8 +1,13 @@
-# Signal Handling en PL7 (v1.0.8)
+
+# Manejo de Señales (Signal Handling) en PL7 (v1.0.8)
+
+## Introducción
+
+El manejo correcto de señales es fundamental en sistemas en tiempo real y aplicaciones multihilo, ya que permite garantizar una terminación ordenada, evitar corrupción de datos y asegurar la portabilidad entre sistemas POSIX (Linux, WSL, contenedores, etc.). En PL7, el modelo implementado es 100% POSIX y portable.
 
 ## Resumen
 
-El sistema implementa un modelo de **terminación controlada de threads** usando bloqueo de señales (`pthread_sigmask`) para garantizar que cuando el usuario presiona **Ctrl+C**, todos los threads terminen de forma ordenada sin corrupción de datos.
+El sistema implementa un modelo de **terminación controlada de hilos** usando bloqueo de señales (`pthread_sigmask`) para garantizar que cuando el usuario presiona **Ctrl+C**, todos los hilos terminen de forma ordenada sin corrupción de datos ni pérdida de logs.
 
 ## Problema Original
 
@@ -10,9 +15,10 @@ En versiones anteriores:
 - Solo `HiloIntArranque` tenía manejador de señales SIGINT/SIGTERM
 - Los otros 7 hilos (Hilo, Hilo2in, HiloPID, HiloSignal, HiloSwitch, HiloTransmisor, HiloReceptor) podían recibir SIGINT directamente
 - Al presionar Ctrl+C, estos threads terminaban abruptamente **antes** de que `HiloIntArranque` pudiera establecer `running=false`
-- Resultaba en potential race conditions y cleanup incompleto
+- Resultaba en condiciones de carrera y limpieza incompleta de recursos
 
 ## Solución Implementada (v1.0.8)
+> **Nota:** Este modelo es portable y funciona en Linux nativo, WSL y la mayoría de entornos POSIX. En sistemas virtualizados o contenedores, asegúrate de que el soporte de señales y `/dev/mqueue` esté habilitado.
 
 ### Arquitectura de Signal Handling
 
@@ -61,6 +67,7 @@ En versiones anteriores:
 ### Implementación Técnica
 
 #### 1. Nuevas funciones globales (hilos/Hilo.cpp)
+> **Importante:** Los includes de las funciones `bloquear_signals()` y `desbloquear_signals()` deben estar presentes en cada hilo que requiera este control.
 
 ```cpp
 void bloquear_signals() {
@@ -103,7 +110,7 @@ void HiloIntArranque::run() {
 - **`pthread_sigmask(SIG_BLOCK, ...)`**: Bloquea una señal solo en el thread actual
 - **No afecta a otros threads**: Cada thread tiene su propia signal mask
 - **HiloIntArranque desbloquea**: Como es creado **después** que `sigprocmask()` afecte el proceso (no ocurre), cada thread hereda la mask de su creador. Al desbloquear en HiloIntArranque, solo ese thread puede recibir SIGINT/SIGTERM
-- **Atomicidad garantizada**: `pthread_sigmask()` es operación atómica por thread
+- **Atomicidad garantizada**: `pthread_sigmask()` es operación atómica por hilo
 
 ### Diagrama de Flujo de Señales
 
@@ -159,7 +166,7 @@ chmod +x test_signal_handling.sh
 
 | Archivo | Cambios |
 |---------|---------|
-| `include/hilos/Hilo.h` | Declaraciones de `bloquear_signals()`, `desbloquear_signals()` |
+| `include/hilos/Hilo.h` | Declaraciones de `bloquear_signals()`, `desbloquear_signals()`. Incluir en cada hilo afectado. |
 | `src/hilos/Hilo.cpp` | Implementaciones de las funciones |
 | `src/hilos/HiloIntArranque.cpp` | `desbloquear_signals()` en `run()` + include Hilo.h |
 | `src/hilos/Hilo2in.cpp` | `bloquear_signals()` en `run()` + include Hilo.h |
@@ -183,44 +190,48 @@ chmod +x test_signal_handling.sh
 
 ### ⚠️ Limitaciones
 
-- Si un thread se queda bloqueado en un syscall que no respeta signal masking, Ctrl+C puede no funcionar inmediatamente
-- La máscara de señales se hereda en `pthread_create()`, por lo que el orden de creación importa
-- No reemplaza manejo de señales más sofisticado (sigwait, sigaction con flags)
+- Si un hilo se queda bloqueado en una llamada al sistema (syscall) que no respeta el enmascaramiento de señales, Ctrl+C puede no funcionar inmediatamente.
+- La máscara de señales se hereda en `pthread_create()`, por lo que el orden de creación de hilos importa.
+- No reemplaza manejo de señales más sofisticado (sigwait, sigaction con flags).
+- **No realices operaciones no seguras dentro de un handler de señal** (solo operaciones async-signal-safe, como escribir a un pipe o establecer flags atómicos).
 
 ### 🔧 Extensibilidad
 
-Si necesitas agregar un nuevo hilo que reciba señales:
+
+**Agregar un nuevo hilo que reciba señales:**
 
 ```cpp
 // En tu nuevo Hilo:
 void MiHilo::run() {
-    desbloquear_signals();  // ← Agregar esta línea
+    desbloquear_signals();  // ← Permite que este hilo reciba señales
     // ... resto del código
 }
 ```
 
-O si necesitas que solo ciertos hilos reciban señales específicas:
+**Bloquear o desbloquear señales selectivamente:**
 
 ```cpp
-// Crear máscaras selectivas
 sigset_t set;
 sigemptyset(&set);
-sigaddset(&set, SIGUSR1);  // Bloquear solo SIGUSR1
-pthread_sigmask(SIG_BLOCK, &set, nullptr);
+sigaddset(&set, SIGUSR1);  // Añadir SIGUSR1 a la máscara
+sigaddset(&set, SIGTERM);  // Añadir SIGTERM si se desea
+pthread_sigmask(SIG_BLOCK, &set, nullptr); // Bloquear esas señales
+// ...
+pthread_sigmask(SIG_UNBLOCK, &set, nullptr); // Desbloquearlas si es necesario
 ```
 
 ## Performance
 
-- **Overhead**: Llamadas a `pthread_sigmask()` y `sigemptyset()` ocurren una sola vez en startup
-- **Impacto**: Negligible (< 1 μs de latencia adicional al inicio de cada thread)
-- **No afecta loop principal**: Signal masking es operación O(1)
+- **Sobrecarga**: Las llamadas a `pthread_sigmask()` y `sigemptyset()` ocurren una sola vez al inicio de cada hilo.
+- **Impacto**: Negligible (< 1 μs de latencia adicional al inicio de cada hilo).
+- **No afecta el bucle principal**: El enmascaramiento de señales es operación O(1).
 
 ## Validación
 
 ```bash
 # Compilación
 cd build && make -j4
-# ✓ 14 tests compilados sin errores
+# ✓ 14 tests compilados sin errores (puede variar según versión)
 
 # Runtime
 ./bin/testHilo
@@ -240,4 +251,4 @@ cd build && make -j4
 **Versión**: 1.0.8  
 **Fecha**: 2026-01-14  
 **Autor**: Jordi + GitHub Copilot  
-**Estado**: Production Ready ✓
+**Estado**: Listo para producción ✓

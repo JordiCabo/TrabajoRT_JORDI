@@ -15,6 +15,7 @@
 #include <sstream>
 #include <csignal>
 #include <errno.h>
+#include <ctime>
 
 namespace DiscreteSystems {
 
@@ -48,6 +49,7 @@ HiloPID::HiloPID(DiscreteSystem* pid, VariablesCompartidas* vars,
  * Ejecuta pthread_join() para asegurar que el hilo finaliza
  * correctamente antes de destruir el objeto HiloPID.
  * RuntimeLogger escribe el buffer final automáticamente en su destructor.
+ * También escribe el buffer de muestras de VariablesCompartidas si existe.
  */
 HiloPID::~HiloPID() {
     int ret = pthread_join(thread_, nullptr);
@@ -55,6 +57,28 @@ HiloPID::~HiloPID() {
         std::cerr << "[HiloPID] Error: pthread_join falló con código " << ret << std::endl;
     } else {
         std::cout << name_ << ": Cerrado correctamente" << std::endl;
+    }
+    
+    // Escribir buffer de muestras a disco DESPUÉS de que termina HiloPID
+    // (igual que RuntimeLogger escribe en su destructor)
+    if (vars_ && vars_->obtenerTamanoBuffer() > 0) {
+        time_t now = time(nullptr);
+        struct tm* tm_info = localtime(&now);
+        char timestamp[32];
+        strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
+        
+        std::ostringstream log_path;
+        log_path << "../logs/ejecucion_" << timestamp << ".log";
+        
+        if (vars_->escribirBufferADisco(log_path.str())) {
+            std::cout << "[HiloPID] Muestras guardadas en " << log_path.str() << std::endl;
+        } else {
+            std::cerr << "[HiloPID] Error escribiendo buffer a disco" << std::endl;
+        }
+        
+        vars_->limpiarBuffer();
+    } else if (vars_) {
+        std::cout << "[HiloPID] Buffer vacío (" << vars_->obtenerTamanoBuffer() << " muestras)" << std::endl;
     }
 }
 
@@ -256,9 +280,24 @@ void HiloPID::run() {
             status = "OK";
         }
         
-        // Log de timing
+		// Log de timing
         logger_.writeLine(iterations_, t_espera_us, t_ejecucion_us, t_total_us, 
                           periodo_us, ts_real_us, status);
+
+        // Guardar muestra de variables compartidas en buffer (thread-safe, POSIX)
+        if (vars_) {
+            std::ostringstream muestra;
+            if (pthread_mutex_lock(&vars_->mtx) == 0) {
+                muestra << "k=" << iterations_
+                        << " | ref=" << vars_->ref
+                        << " | e=" << vars_->e
+                        << " | u=" << vars_->u
+                        << " | yk=" << vars_->yk
+                        << " | ykd=" << vars_->ykd;
+                pthread_mutex_unlock(&vars_->mtx);
+            }
+            vars_->guardarMuestraEnBuffer(iterations_, muestra.str());
+        }
 
         // 5. Dormir hasta el siguiente período absoluto (sin drift)
         timer.esperar();

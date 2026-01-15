@@ -17,74 +17,87 @@ Framework de control de sistemas en tiempo real implementado en C++17. Incluye l
 El sistema implementa un lazo de control digital en tiempo real con la siguiente estructura:
 
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                        LAZO DE CONTROL CERRADO                             │
-└────────────────────────────────────────────────────────────────────────────┘
+                                                            ┌────────────────────────────────────────────────────────────────────────────┐
+                                                            │                        LAZO DE CONTROL CERRADO                             │
+                                                            └────────────────────────────────────────────────────────────────────────────┘
 
-                              ┌─────────────────┐            ┌───────────────────────────────────┐
-                              │   Generador     │══════════► │  VARIABLES COMPARTIDAS            │
-                              │   de Señales    │            │  (std::mutex protegidas)          │
-                              │  (Step/Sine)    │            │                                   │
-                              └────────┬────────┘            │ • ref(t)        Referencia        │ 
-                                       │ ref(t)              │ • e(t)          Error             │
-                                       │ (referencia)        │ • u(t)          Control PID       │
-                                       ▼                     │ • u_analog(t)   Salida D/A        │
-                           ┌────────────────┐                │ • y(t)          Salida Planta     │
-                     ┌────►│    Sumador     │<══════════════►│ • y_digital[k]  Retroalimentación │
-                     │     │   (ref - y)    │                │                                   │
-                     │     └────────┬───────┘                │                                   │
-                     │              │ e(t)                   │                                   │
-                     │              │ (error)                │                                   │
-                     │              ▼                        │                                   │
-                     │     ┌────────────────┐                │                                   │
-                     │     │   Regulador    │<══════════════►│                                   │
-                     │     │      PID       │                │                                   │
-                     │     │  (Kp,Ki,Kd)    │                │                                   │
-                     │     └────────┬───────┘                │                                   │
-                     │              │ u(t)                   │                                   │
-                     │              │ (control)              │                                   │
-                     │              ▼                        │                                   │
-                     │     ┌────────────────┐                │                                   │
-                     │     │  Conversor D/A │<══════════════►│                                   │
-                     │     │      (ZOH)     │                │                                   │
-                     │     └────────┬───────┘                │                                   │
-                     │              │ u_analog(t)            │                                   │
-                     │              │                        │                                   │
-                     │              ▼                        │                                   │
-                     │     ┌────────────────┐                │                                   │
-                     │     │     Planta     │<══════════════►│                                   │
-                     │     │  G(s) o SS     │                │                                   │
-                     │     │                │                │                                   │
-                     │     └────────┬───────┘                │                                   │
-                     │              │ y(t)                   │                                   │
-                     │              │ (salida)               │                                   │
-                     │              ▼                        │                                   │
-                     │     ┌────────────────┐                │                                   │
-                     │     │  Conversor A/D │<══════════════►│                                   │
-                     │     │  (Muestreo)    │                │                                   │
-                     │     └────────┬───────┘                │                                   │
-                     │              │ y_digital[k]           │                                   │
-                     └──────────────┘ (retroalimentación)    └───────────────────────────────────┘
+                                    ┌─────────────────┐            ┌───────────────────────────────────┐            ┌───────────────────────────────────┐
+                                    │   Generador     │══════════► │  VARIABLES COMPARTIDAS            │            │  PARAMETROS COMPARTIDOS           │
+                                    │   de Señales    │            │  (std::mutex protegidas)          │            │  (mutex POSIX protegidos)         │
+                                    │  (Step/Sine)    │            │                                   │            │                                   │
+                                    └────────┬────────┘            │ • ref(t)        Referencia        │            │ • Kp, Ki, Kd   Ganancias PID      │
+                                             │ ref(t)              │ • e(t)          Error             │            │ • setpoint     Referencia         │
+                                             │ (referencia)        │ • u(t)          Control PID       │            │ • signal_type  Tipo de señal      │
+                                             ▼                     │ • u_analog(t)   Salida D/A        │            │                                   │
+                                 ┌────────────────┐                │ • y(t)          Salida Planta     │            │                                   │
+                           ┌────►│    Sumador     │<══════════════►│ • y_digital[k]  Retroalimentación │            │                                   │
+                           │     │   (ref - y)    │                │                                   │            │                                   │
+                           │     └────────┬───────┘                │                                   │            │                                   │
+                           │              │ e(t)                   │                                   │            │                                   │
+                           │              │ (error)                │                                   │            │                                   │
+                           │              ▼                        │                                   │            │                                   │
+                           │     ┌────────────────┐                │                                   │            │                                   │
+                           │     │   Regulador    │<══════════════►│                                   │            │                                   │
+                           │     │      PID       │                │                                   │            │                                   │
+                           │     │  (Kp,Ki,Kd)    │                │                                   │            │                                   │
+                           │     └────────┬───────┘                │                                   │            │                                   │
+                           │              │ u(t)                   │                                   │            │                                   │
+                           │              │ (control)              │                                   │            │                                   │
+                           │              ▼                        │                                   │            │                                   │
+                           │     ┌────────────────┐                │                                   │            │                                   │
+                           │     │  Conversor D/A │<══════════════►│                                   │            │                                   │
+                           │     │      (ZOH)     │                │                                   │            │                                   │
+                           │     └────────┬───────┘                │                                   │            │                                   │
+                           │              │ u_analog(t)            │                                   │            │                                   │
+                           │              │                        │                                   │            │                                   │
+                           │              ▼                        │                                   │            │                                   │
+                           │     ┌────────────────┐                │                                   │            │                                   │
+                           │     │     Planta     │<══════════════►│                                   │            │                                   │
+                           │     │  G(s) o SS     │                │                                   │            │                                   │
+                           │     │                │                │                                   │            │                                   │
+                           │     └────────┬───────┘                │                                   │            │                                   │
+                           │              │ y(t)                   │                                   │            │                                   │
+                           │              │ (salida)               │                                   │            │                                   │
+                           │              ▼                        │                                   │            │                                   │
+                           │     ┌────────────────┐                │                                   │            │                                   │
+                           │     │  Conversor A/D │<══════════════►│                                   │            │                                   │
+                           │     │  (Muestreo)    │                │                                   │            │                                   │
+                           │     └────────┬───────┘                │                                   │            │                                   │
+                           │              │ y_digital[k]           │                                   │            │                                   │
+                           └──────────────┘ (retroalimentación)    └───────────────────────────────────┘            └───────────────────────────────────┘
+                                                                                      ▼                                             ▲
+                                                                              ┌───────────────┐                             ┌───────────────┐
+                                                                              │ TRANSMISOR    │                             │  RECEPTOR     │
+                                                                              │ (DataMessage) │                             │(ParamsMessage)│
+                                                                              └───────┬───────┘                             └───────┬───────┘
+                                                                                      ▼                                             ▲
+                                                                                      ▼                                             ▲
+                                                                                      ▼                                             ▲
+                                                                                      ┌─────────────────────────────────────────────┐
+                                                                                      │                 GUI (Qt)                    │
+                                                                                      └─────────────────────────────────────────────┘
 
-Leyenda: ═══► Acceso lectura/escritura a variables compartidas protegidas por mutex
-```
+                  Leyenda: ═══► Acceso lectura/escritura a variables compartidas protegidas por mutex
+                      ◄───────► Comunicación IPC (DataMessage/ParamsMessage) entre simulador y GUI
+                  ```
 
 Variables Compartidas (protegidas por std::mutex):
-   • ref(t)      : Referencia del generador de señales
-   • e(t)        : Error = ref - y (salida del sumador)
-   • u(t)        : Acción de control del PID
-   • u_analog(t) : Salida del conversor D/A
-   • y(t)        : Salida de la planta
-   • y_digital[k]: Salida del conversor A/D (retroalimentación)
+   • ref         : Referencia del generador de señales
+   • error       : Error = ref - y (salida del sumador)
+   • u           : Acción de control del PID
+   • ua          : Salida del conversor D/A
+   • yk          : Salida de la planta
+   • ykd         : Salida del conversor A/D (retroalimentación)
 
 ### Componentes IPC y sintonización en línea
 
 - **ParametrosCompartidos**: Kp, Ki, Kd, setpoint y selector de señal (`signal_type`) protegidos con mutex POSIX.
-- **VariablesCompartidas**: ref, e, u, ua, yk, ykd, running con mutex POSIX para el lazo principal.
-- **Receptor/HiloReceptor**: Reciben `ParamsMessage` desde `/params_queue` y actualizan `ParametrosCompartidos` periódicamente.
-- **Transmisor/HiloTransmisor**: Envían `DataMessage` a `/data_queue` con ref, u, yk y timestamp para la GUI.
+- **VariablesCompartidas**: ref, error, u, ua, yk, ykd, running con mutex POSIX para el lazo principal.
+- **Receptor/Transmisor**: Objetos funcionales que gestionan la recepción/envío de mensajes IPC (ParamsMessage/DataMessage).
+- **HiloReceptor/HiloTransmisor**: Hilos periódicos que ejecutan los métodos de Receptor/Transmisor a frecuencia fija.
 - **HiloPID**: Ejecuta PID leyendo parámetros dinámicamente en cada ciclo (sintonización en línea).
 - **SignalSwitch/HiloSwitch**: Multiplexa step/rampa/seno/PWM leyendo `signal_type` actualizado por la GUI.
+
 
 ### Flujo de Datos
 
@@ -118,40 +131,47 @@ Variables Compartidas (protegidas por std::mutex):
    - Introduce retardo de 1 período (T_s)
    - Variable compartida: `feedback_`
 
+7. **Transmisor (Emisor)** (`Transmisor`/`HiloTransmisor`)
+   - Envía datos del sistema (ref, u, yk, timestamp) a la GUI mediante mensajes IPC (`DataMessage`)
+   - Conexión: `/data_queue` → GUI Qt
+
+8. **Receptor** (`Receptor`/`HiloReceptor`)
+   - Recibe parámetros de la GUI (Kp, Ki, Kd, setpoint, tipo de señal) mediante mensajes IPC (`ParamsMessage`)
+   - Conexión: `/params_queue` ← GUI Qt
+
 ### Ejecución en Tiempo Real
 
 Cada bloque se ejecuta en un hilo pthread independiente (`Hilo`, `Hilo2in`, `HiloSignal`) a frecuencia fija configurable (típicamente 1000 Hz).
 
 ```cpp
-// Ejemplo de configuración del lazo
-std::mutex mtx;
-bool running = true;
 
-// Variables compartidas
-double ref = 0.0, error = 0.0, control = 0.0;
-double control_analog = 0.0, plant_output = 0.0, feedback = 0.0;
+// Ejemplo de configuración del lazo (versión real, comentarios didácticos)
+std::mutex mtx; // Mutex global para sincronización
+auto vars = std::make_shared<VariablesCompartidas>(); // Variables compartidas del lazo
+auto params = std::make_shared<ParametrosCompartidos>(); // Parámetros PID y señal
+auto running = std::make_shared<bool>(true); // Flag de ejecución
 
-// Bloques del sistema
-SignalGenerator::StepSignal generator(Ts, amplitude);
-DiscreteSystems::Sumador sumador(Ts);
-DiscreteSystems::PIDController pid(Kp, Ki, Kd, Ts);
-DiscreteSystems::DAConverter dac(Ts);
-DiscreteSystems::TransferFunctionSystem planta(num, den, Ts);
-DiscreteSystems::ADConverter adc(Ts);
+// Bloques del sistema (cada uno implementa la interfaz adecuada)
+auto generator = std::make_shared<SignalGenerator::StepSignal>(Ts, amplitude); // Generador de referencia
+auto sumador = std::make_shared<DiscreteSystems::Sumador>(Ts);                 // Calcula error
+auto pid = std::make_shared<DiscreteSystems::PIDController>(Kp, Ki, Kd, Ts);   // Regulador PID
+auto dac = std::make_shared<DiscreteSystems::DAConverter>(Ts);                 // Conversor D/A
+auto planta = std::make_shared<DiscreteSystems::TransferFunctionSystem>(num, den, Ts); // Planta
+auto adc = std::make_shared<DiscreteSystems::ADConverter>(Ts);                 // Conversor A/D
 
-// Hilos de ejecución @ 1000 Hz
-SignalGenerator::HiloSignal hilo_gen(&generator, &ref, &running, &mtx, 1000);
-DiscreteSystems::Hilo2in hilo_sumador(&sumador, &ref, &feedback, &error, &running, &mtx, 1000);
-DiscreteSystems::Hilo hilo_pid(&pid, &error, &control, &running, &mtx, 1000);
-DiscreteSystems::Hilo hilo_dac(&dac, &control, &control_analog, &running, &mtx, 1000);
-DiscreteSystems::Hilo hilo_planta(&planta, &control_analog, &plant_output, &running, &mtx, 1000);
-DiscreteSystems::Hilo hilo_adc(&adc, &plant_output, &feedback, &running, &mtx, 1000);
+// Hilos de ejecución: cada uno ejecuta su bloque a frecuencia fija
+SignalGenerator::HiloSignal hilo_gen(generator.get(), &vars->ref, running.get(), &mtx, freq_component, SystemConfig::HILO_REF_NAME); // Generador
+DiscreteSystems::Hilo2in hilo_sumador(sumador.get(), &vars->ref, &vars->ykd, &vars->error, running.get(), &mtx, freq_component, SystemConfig::HILO_SUMADOR_NAME); // Sumador
+DiscreteSystems::HiloPID hilo_regulador(pid.get(), vars.get(), params.get(), freq_controller, SystemConfig::HILO_PID_NAME); // Regulador PID
+DiscreteSystems::Hilo hilo_dac(dac.get(), &vars->u, &vars->ua, running.get(), &mtx, freq_component, SystemConfig::HILO_DA_NAME); // D/A
+DiscreteSystems::Hilo hilo_planta(planta.get(), &vars->ua, &vars->yk, running.get(), &mtx, freq_component, SystemConfig::HILO_PLANTA_NAME); // Planta
+DiscreteSystems::Hilo hilo_adc(adc.get(), &vars->yk, &vars->ykd, running.get(), &mtx, freq_component, SystemConfig::HILO_AD_NAME); // A/D
 
 // Hilos IPC opcionales (GUI en tiempo real)
-HiloSwitch hilo_ref(&signalSwitch, &ref, &running, &mtx, &params, 100);     // Referencia seleccionable
-HiloPID hilo_pid_dyn(&pid, &vars, &params, 100);                           // PID con Kp/Ki/Kd dinámicos
-HiloReceptor hilo_rx(&receptor, &running, &mtx, 50);                       // Recibe ParamsMessage
-HiloTransmisor hilo_tx(&transmisor, &running, &mtx, 50);                   // Envía DataMessage
+HiloSwitch hilo_ref(&signalSwitch, &vars->ref, running.get(), &mtx, params.get(), 100);     // Referencia seleccionable
+HiloPID hilo_pid_dyn(pid.get(), vars.get(), params.get(), 100, SystemConfig::HILO_PID_NAME); // PID con Kp/Ki/Kd dinámicos
+HiloReceptor hilo_rx(&receptor, running.get(), &mtx, 50);                       // Recibe ParamsMessage
+HiloTransmisor hilo_tx(&transmisor, running.get(), &mtx, 50);                   // Envía DataMessage
 ```
 
 ## Componentes Principales
@@ -189,17 +209,18 @@ HiloTransmisor hilo_tx(&transmisor, &running, &mtx, 50);                   // En
 
 ## Patrones de Diseño
 
-- **NVI (Non-Virtual Interface)**: `DiscreteSystem::next()` garantiza almacenamiento
-- **RAII**: Gestión automática de recursos (threads, mutex)
-- **Strategy**: Intercambio de generadores de señal
-- **Dependency Injection**: Hilos reciben punteros a sistemas
+- **NVI (Non-Virtual Interface)**: `DiscreteSystem::next()` garantiza almacenamiento y consistencia de buffer circular
+- **RAII**: Gestión automática de recursos (threads, mutex, colas IPC)
+- **Strategy**: Intercambio de generadores de señal y sistemas discretos
+- **Dependency Injection**: Hilos reciben punteros a sistemas, facilitando testabilidad
+- **Instrumentación selectiva**: Solo hilos de control instrumentados con `RuntimeLogger` (buffer circular, flush periódico)
 
 ## Características de Tiempo Real
 
 - Ejecución pthread a frecuencia fija (Hz definida en `config/system_config.h`)
 - Sincronización con `std::mutex`, `std::lock_guard` y `pthread_mutex_timedlock` (timeout 20% período)
 - Temporización absoluta con `Temporizador` para eliminar drift (`clock_nanosleep` + `TIMER_ABSTIME`)
-- **RuntimeLogger** con buffer circular para diagnóstico en tiempo real (solo hilos de control)
+- **RuntimeLogger** con buffer circular para diagnóstico en tiempo real (solo hilos de control, logging selectivo)
 - Signal handler (SIGINT/SIGTERM) para parada limpia sin errores pthread_join
 - Error logging centralizado: stderr redirigido a `logs/error_log_YYYYMMDD_HHMMSS.txt`
 - Configuración centralizada (SSOT) en `config/system_config.h`: frecuencias, períodos, buffers
@@ -209,21 +230,24 @@ HiloTransmisor hilo_tx(&transmisor, &running, &mtx, 50);                   // En
 
 ## Uso Rápido
 
+
 Ver ejemplos detallados en cada clase. Para comenzar:
 
 ```cpp
 #include "sistemas/PIDController.h"
-#include "sistemas/TransferFunctionSystem.h"
 
-// Ver clase PIDController para ejemplo completo
+DiscreteSystems::PIDController pid(0.001, 10, 1.0, 0.5, 0.1);
+for(int i = 0; i < 100; i++) {
+   double y = pid.next(1.0 - pid.compute());  // retroalimentación de error
+}
 ```
 
 ## Navegación
 
-- Ver jerarquía de clases en el menú "Classes"
+- Ver jerarquía de clases en el menú "Classes" (Doxygen)
 - Buscar funciones específicas en "Class Members"
 - Revisar archivos fuente en "Files" (organizados por carpeta temática)
-- Consultar ejemplos en las páginas de cada clase
+- Consultar ejemplos y diagramas de herencia/colaboración en las páginas de cada clase
 
 ---
 

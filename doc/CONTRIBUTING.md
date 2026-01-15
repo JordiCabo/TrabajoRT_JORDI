@@ -1,8 +1,45 @@
+
 # Guía de Contribución
 
 ¡Gracias por tu interés en contribuir a PL7 Control de Sistemas Discretos! Este documento proporciona directrices para contribuir al proyecto.
 
+
 ## 📋 Tabla de Contenidos
+    - [Ejecución de Tests](#ejecución-de-tests)
+    - [Documentación y Diagramas](#documentación-y-diagramas)
+    - [Archivos de Configuración Clave](#archivos-de-configuración-clave)
+## 🧪 Ejecución de Tests
+
+Todos los tests unitarios se encuentran en la carpeta `test/` y se auto-descubren con CMake. Para compilar y ejecutar los tests:
+
+```bash
+cd build
+cmake .. && make
+./bin/testPID         # Ejecuta el test de PID
+./bin/testTF          # Ejecuta el test de función de transferencia
+# ...otros binarios en ./bin/
+```
+
+Los resultados pueden guardarse en archivos CSV/TSV en el directorio `test/`.
+
+## 📖 Documentación y Diagramas
+
+La documentación completa de la API está generada con Doxygen. Consulta los diagramas y descripciones en:
+- `doc/ARCHITECTURE.md` (arquitectura y diagramas de flujo)
+- `doc/mainpage.md` (resumen general)
+- Documentación HTML generada por Doxygen en `doc/doxygen/html/index.html`
+
+## 🛠️ Archivos de Configuración Clave
+
+- `include/config/system_config.h`: configuración centralizada (SSOT)
+- `CMakeLists.txt`: configuración de build y tests
+
+## 📝 Estándar de Código
+
+- C++17 obligatorio en todo el proyecto
+- Usa `clang-format` para mantener el estilo consistente (opcional pero recomendado)
+- Sigue los patrones de diseño modernos (RAII, NVI, smart pointers)
+
 
 - [Código de Conducta](#código-de-conducta)
 - [¿Cómo puedo contribuir?](#cómo-puedo-contribuir)

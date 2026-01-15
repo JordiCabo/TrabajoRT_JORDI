@@ -5,7 +5,16 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
-## [1.0.10] - 2026-01-14
+
+## [1.0.10.1] - 2026-01-15
+
+### Destacado / Mejoras Globales
+- **Instrumentación avanzada y logging selectivo**: Solo los hilos de control (Hilo, Hilo2in, HiloPID, HiloSwitch, HiloSignal, HiloIntArranque) generan logs con `RuntimeLogger`. Los hilos de comunicación IPC (HiloTransmisor, HiloReceptor) no generan logs para evitar overhead.
+- **Centralización de configuración**: Todas las constantes críticas (frecuencias, buffers, timeouts, nombres de hilos, parámetros PID y planta) se gestionan en `system_config.h` como SSOT usando `constexpr` en el namespace `SystemConfig`.
+- **Modularización de señales**: Cada tipo de señal (`Signal`, `StepSignal`, `SineSignal`, `PwmSignal`, `SignalMixer`) tiene su propio header y fuente, facilitando la extensión y el mantenimiento (v1.0.9).
+- **Shutdown robusto y manejo de señales**: Todos los hilos bloquean SIGINT/SIGTERM salvo `HiloIntArranque`, que gestiona la parada limpia. El handler global asegura que `running=false` se propaga correctamente y no hay errores de `pthread_join` ni fugas de recursos.
+- **Optimización de frecuencia IPC**: La frecuencia de comunicación entre simulador y GUI se ajusta a 10 Hz (100ms) para balancear overhead y responsividad.
+- **Mejoras de documentación**: Ejemplos de uso, diagramas de flujo y referencias cruzadas añadidas en `ARCHITECTURE.md`, `mainpage.md` y otros documentos clave. Documentación Doxygen actualizada.
 
 ### Arreglado
 - **Mensajes de cierre duplicados clarificados**:

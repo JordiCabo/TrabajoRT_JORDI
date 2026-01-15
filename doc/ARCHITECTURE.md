@@ -1,6 +1,21 @@
+
 # Arquitectura del Proyecto PL7
 
-Este documento describe la arquitectura de alto nivel del sistema de Control de Sistemas Discretos.
+**Versión:** v1.0.6 (enero 2026, actualizado)
+
+Este documento describe la arquitectura de alto nivel del sistema de Control de Sistemas Discretos, reflejando las mejoras recientes y la estructura modular vigente.
+
+
+## 🧩 API Pública
+
+El proyecto PL7 expone una API pública sencilla y robusta, documentada con Doxygen, que permite instanciar, configurar y ejecutar sistemas discretos, hilos de control y generadores de señal de forma segura y centralizada. Ejemplos de uso y patrones de integración se encuentran al final de este documento.
+
+**Mejoras recientes:**
+- Instrumentación avanzada (`RuntimeLogger` con buffer circular, logging selectivo solo en hilos de control)
+- Timedlock (timeout 20%) en hilos críticos (`HiloPID`)
+- Centralización de configuración en `system_config.h` (SSOT, `constexpr` en `SystemConfig`)
+- Modularización de señales: clases separadas para `Signal`, `StepSignal`, `SineSignal`, `PwmSignal`, `SignalMixer` (v1.0.9)
+- Manejo robusto de señales: todos los hilos usan signal handler y parada limpia con SIGINT/SIGTERM
 
 ## 📐 Diagrama de Arquitectura
 
@@ -9,18 +24,17 @@ Este documento describe la arquitectura de alto nivel del sistema de Control de 
 │                   LIBRERÍA CORE DISCRETESYSTEMS                 │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │         Sistemas Discretos (C++17 STL-only)              │  │
-│  │                                                          │  │
-│  │  - DiscreteSystem (base NVI)                            │  │
-│  │  - PIDController, TransferFunctionSystem, etc.          │  │
 │  │  - Discretizer (Tustin bilineal)                        │  │
 │  │  - SignalGenerator (Step, Sine, Ramp, PWM)             │  │
+│  │  - Señales modulares: StepSignal, SineSignal, PwmSignal│  │
 │  │  - Hilo/Hilo2in/HiloSignal + Temporizador (threading)  │  │
 │  │  - ADConverter/DAConverter/Sumador                      │  │
 │  │                                                          │  │
 │  │  Buffer circular | Patrón NVI | Tests unitarios        │  │
+│  │  Logging selectivo (solo hilos de control)             │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                 │
+
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -39,39 +53,31 @@ Este documento describe la arquitectura de alto nivel del sistema de Control de 
 
 ### 1. Capa de Dominio (Core Library)
 
+
 **Ubicación**: `src/`, `include/`  
 **Namespace**: `DiscreteSystems::`, `SignalGenerator::`
+**Configuración centralizada**: `include/config/system_config.h` (SSOT, `constexpr`)
 
-Implementa la lógica de control y sistemas discretos en carpetas temáticas:
 
 ```
 include/
-├── sistemas/         ← DiscreteSystem, PIDController, TF, SS, Discretizer
-├── senales/          ← Signal, SignalGenerator, Temporizador
+├── senales/          ← Signal, StepSignal, SineSignal, PwmSignal, SignalMixer, Temporizador
 ├── hilos/            ← Hilo, Hilo2in, HiloPID, etc.
 ├── converters/       ← ADConverter, DAConverter
-├── io/               ← Transmisor, Receptor
 ├── utilidades/       ← RuntimeLogger, Sumador, etc.
 └── config/           ← system_config.h, comm.h, messages.h
 
-src/
 ├── sistemas/         ← Implementaciones de sistemas discretos
 ├── senales/          ← Implementaciones de generadores
 ├── hilos/            ← Implementaciones de threading
-├── converters/       ← Implementaciones de conversores
 ├── io/               ← Implementaciones de comunicación
 ├── utilidades/       ← Implementaciones auxiliares
 └── config/           ← (archivos de configuración)
-```
 
 ```cpp
 DiscreteSystem (abstracta)
     │
     ├── PIDController
-    ├── TransferFunctionSystem
-    ├── StateSpaceSystem
-    ├── ADConverter
-    ├── DAConverter
     └── Sumador
 
 Signal (abstracta)
@@ -80,16 +86,12 @@ Signal (abstracta)
     ├── StepSignal
     ├── RampSignal
     └── PWMSignal
-```
 
 **Ubicación de archivos**: Todos organizados en `include/sistemas/`, `include/senales/`, etc.
 
-**Responsabilidades**:
-- Implementar algoritmos de control discreto
-- Gestionar buffers circulares de muestras
-- Proporcionar API reutilizable y testeable
-- Instrumentación con `RuntimeLogger` (solo hilos de control)
-- Configuración centralizada via `system_config.h`
+- Instrumentación con `RuntimeLogger` (solo hilos de control, logging selectivo)
+- Configuración centralizada via `system_config.h` (SSOT, `constexpr`)
+- Modularización de señales: cada tipo en su propio header (v1.0.9)
 
 ### 2. Capa de Threading
 
@@ -110,8 +112,6 @@ HiloSwitch    // Selector de señal por tipo (instrumentado con RuntimeLogger)
 - Temporización absoluta mediante `Temporizador` (`clock_nanosleep` + `TIMER_ABSTIME`) para evitar drift
 - Sincronizar acceso con `std::mutex` y `timedlock` (timeout 20% del período)
 - Gestión de lifecycle de threads (`pthread`)
-- Diagnóstico en tiempo real con `RuntimeLogger` (buffer circular de 1000 muestras)
-
 ## 🔒 Sincronización y Variables Compartidas
 
 Esta sección detalla cómo se sincronizan los hilos y cómo se realiza el acceso a las variables compartidas del lazo de control.
@@ -175,21 +175,14 @@ Este patrón se aplica análogamente en `Hilo` (1 entrada → 1 salida) y `HiloS
     - Lee: `y`, `running`
     - Escribe: `y_digital`
 
+
 ### Principios de Diseño
 
 - **Regiones críticas cortas**: leer/escribir bajo mutex y computar fuera.
 - **Sin deadlocks**: un único mutex compartido, sin bloqueos anidados.
 - **Jitter controlado**: el período se mantiene con `Temporizador` (`clock_nanosleep` con `TIMER_ABSTIME`), el tiempo bajo lock es mínimo.
-- **Terminación ordenada**: implementada mediante bloqueo de señales (signal masking) en todos los hilos excepto `HiloIntArranque`:
-  - Función `bloquear_signals()`: bloquea SIGINT/SIGTERM en el hilo actual usando `pthread_sigmask(SIG_BLOCK)`
-  - Función `desbloquear_signals()`: desbloquea SIGINT/SIGTERM en el hilo actual usando `pthread_sigmask(SIG_UNBLOCK)`
-  - Flujo de terminación:
-    1. Usuario presiona Ctrl+C → SIGINT dispatched al proceso
-    2. Solo `HiloIntArranque` puede recibir SIGINT (otros tienen bloqueado)
-    3. `HiloIntArranque::manejador_signal()` establece `running=false` bajo mutex
-    4. Todos los demás hilos leen `running` en sus loops y terminan limpiamente
-  - Beneficio: previene terminación abrupta de otros threads antes de que `running` sea puesta a false
-- **Timedlock con timeout**: `HiloPID` usa timeout del 20% del período para evitar bloqueos indefinidos.
+- **Terminación ordenada y robusta**: todos los hilos bloquean SIGINT/SIGTERM salvo `HiloIntArranque`, que gestiona la parada limpia. El handler global asegura que `running=false` se propaga correctamente y no hay errores de `pthread_join` ni fugas de recursos. (Ver detalles en SIGNAL_HANDLING.md)
+- **Timedlock con timeout**: `HiloPID` usa timeout del 20% del período para evitar bloqueos indefinidos (desde v1.0.6).
 
 ### Observaciones Operativas
 
@@ -468,6 +461,7 @@ memcpy(&msg.Kp, buffer + offset, sizeof(double)); offset += sizeof(double);
 └────────────────────────────────────────┘
 ```
 
+
 ## 🔄 Flujos de Datos Principales
 
 ### Flujo de Control (Loop Cerrado)
@@ -484,6 +478,7 @@ memcpy(&msg.Kp, buffer + offset, sizeof(double)); offset += sizeof(double);
 2. **Simulador deserializa** el mensaje
 3. **PID actualizado** con `setGains(Kp, Ki, Kd)`
 4. **Control continúa** con nuevos parámetros
+
 
 ## 🧵 Modelo de Concurrencia
 
@@ -515,6 +510,7 @@ GUI/Aplicación del Profesor
         │
         └── Procesamiento de datos recibidos
 ```
+
 
 ## 🛡️ Patrones de Diseño
 
@@ -573,6 +569,7 @@ Hilos reciben punteros a sistemas discretos, permitiendo testabilidad y flexibil
 DiscreteSystem* system = ...; // Puede ser PID, TF, SS, etc.
 Hilo hilo(system, ...);
 ```
+
 
 ## 📊 Gestión de Memoria
 
@@ -643,6 +640,7 @@ void Hilo::run() {
 
 **Nota**: Usa temporización absoluta para evitar drift. Para aplicaciones hard real-time críticas, considerar scheduler RT de Linux.
 
+
 ## 🧪 Testabilidad
 
 ### Inyección de Dependencias
@@ -666,6 +664,7 @@ foreach(TEST_SRC ${TEST_SOURCES})
 endforeach()
 ```
 
+
 ## 📈 Performance
 
 ### Hot Loop Optimizations
@@ -683,6 +682,7 @@ endforeach()
 cmake -DCMAKE_BUILD_TYPE=Release ..
 # Flags: -O3 -march=native
 ```
+
 
 ### Métricas en Producción (v1.0.6)
 
@@ -703,6 +703,7 @@ RuntimeLogger:
 - Flush: Cada 100 iteraciones (SystemConfig::LOGGER_FLUSH_INTERVAL)
 - Overhead: Negligible (escritura a RAM, flush asíncrono)
 ```
+
 
 ## 🔍 Debugging
 
@@ -777,7 +778,15 @@ ls -la /dev/mqueue/
 ./Interfaz_Control/bin/test_receive
 ```
 
+
 ## 📚 Referencias Arquitectónicas
+
+---
+
+### Referencias cruzadas y notas
+- Para debilidades históricas y mejoras, ver [ASSESSMENT.md](ASSESSMENT.md) y [CHANGELOG.md](CHANGELOG.md)
+- Para detalles de shutdown y signal handling, ver [SIGNAL_HANDLING.md](SIGNAL_HANDLING.md)
+- Para roadmap y documentos obsoletos, ver [v1.0.5-ROADMAP.md](v1.0.5-ROADMAP.md)
 
 - **Patrón NVI**: Herb Sutter, "Virtuality"
 - **RAII**: Bjarne Stroustrup, "The C++ Programming Language"

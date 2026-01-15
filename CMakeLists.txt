@@ -13,7 +13,9 @@ file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 file(MAKE_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 
 # ---- Librería estática de tus .cpp ----
-file(GLOB_RECURSE LIB_SOURCES "${CMAKE_SOURCE_DIR}/src/**/*.cpp")
+file(GLOB LIB_SOURCES
+    "${CMAKE_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_SOURCE_DIR}/src/**/*.cpp")
 add_library(DiscreteSystems STATIC ${LIB_SOURCES})
 target_include_directories(DiscreteSystems PUBLIC 
     ${CMAKE_SOURCE_DIR}/include

@@ -53,7 +53,40 @@ void signalHandler(int signum) {
     }
 }
 
+// Función para lanzar la GUI en background
+pid_t lanzarGui() {
+    std::cout << "[Main] Lanzando GUI..." << std::endl;
+    
+    pid_t gui_pid = fork();
+    if (gui_pid == 0) {
+        // Proceso hijo: ejecutar GUI
+        // Redirigir stdout y stderr de la GUI a /dev/null para no interferir
+        freopen("/dev/null", "w", stdout);
+        freopen("/dev/null", "w", stderr);
+        
+        execl("../Gui/gui_app", "gui_app", (char*)NULL);
+        // Si exec falla (se escribe antes de redirigir stderr del proceso principal):
+        perror("[Main] Error execl GUI");
+        exit(1);
+    } else if (gui_pid < 0) {
+        std::cerr << "[Main] Error al hacer fork() para GUI" << std::endl;
+        return -1;
+    }
+    
+    // Esperar un poco para que la GUI se inicialice
+    sleep(2);
+    std::cout << "[Main] GUI lanzada (PID: " << gui_pid << ")" << std::endl;
+    
+    return gui_pid;
+}
+
 int main() {
+    // --- Lanzar GUI ---
+    pid_t gui_pid = lanzarGui();
+    if (gui_pid < 0) {
+        return 1;
+    }
+    
     // --- Crear directorio de logs en raíz del proyecto ---
     mkdir("../logs", 0755);
     
@@ -111,25 +144,25 @@ int main() {
     interruptor->setRun(1);
 
     // Crear el hilo del interruptor de arranque/paro (frecuencia de componentes)
-    HiloIntArranque hiloInterruptor(interruptor, running.get(), mtx, freq_component, "hiloInterruptor");
+    HiloIntArranque hiloInterruptor(interruptor, running.get(), mtx, freq_component, SystemConfig::HILO_INTERRUPT_NAME);
 
     //-------------------------------------------------------------
     // --------- Crear la referencia (SignalSwitch) ---------------
     //-------------------------------------------------------------
-    // Parámetros del escalón
+    // Parámetros del escalón y señales desde SystemConfig
     double Ts_signal = Ts_component;     // período de muestreo común [s]
-    double amplitude = 1.0;     // amplitud
-    double step_time = 0.05;     // tiempo del escalón
-    double offset = 0.0;         // desplazamiento vertical
-   
+    double amplitude   = SystemConfig::SIGNAL_AMPLITUDE;
+    double step_time   = SystemConfig::SIGNAL_STEP_TIME;
+    double offset      = SystemConfig::SIGNAL_OFFSET;
+
     // Parámetros para el seno
-    double freq = 1.0;           // frecuencia en Hz
-    double phase = 0.0;          // fase en radianes
-    double sinAmp=10.0;
-    
+    double freq        = SystemConfig::SIGNAL_SIN_FREQ;
+    double phase       = SystemConfig::SIGNAL_SIN_PHASE;
+    double sinAmp      = SystemConfig::SIGNAL_SIN_AMP;
+
     // Parámetros para PWM
-    double duty = 0.5;           // ciclo de trabajo
-    double period_pwm = 1.0;     // período de PWM [s]
+    double duty        = SystemConfig::SIGNAL_PWM_DUTY;
+    double period_pwm  = SystemConfig::SIGNAL_PWM_PERIOD;
 
     // Crear las 3 señales como shared_ptr
     auto stepSignal = std::make_shared<SignalGenerator::StepSignal>(Ts_signal, amplitude, step_time, offset);
@@ -143,7 +176,7 @@ int main() {
     std::shared_ptr<double> ref(&vars->ref, [](double*){});
     
     // Crear HiloSwitch para ejecutar el switch periódicamente (escribe en vars->ref)
-    HiloSwitch hiloRef(signalSwitch, ref, running.get(), mtx, params, freq_component, "hiloRef");
+    HiloSwitch hiloRef(signalSwitch, ref, running.get(), mtx, params, freq_component, SystemConfig::HILO_REF_NAME);
   
   
     //-------------------------------------------------------------
@@ -172,7 +205,7 @@ int main() {
     // --------------- Crear hilo de la planta --------------------
     //-------------------------------------------------------------
     // Planta lee vars->ua, escribe vars->yk
-    Hilo hiloPlanta(planta, ua, yk, running.get(), mtx, frequency_plant, "hiloPlanta");
+    Hilo hiloPlanta(planta, ua, yk, running.get(), mtx, frequency_plant, SystemConfig::HILO_PLANTA_NAME);
 
     //-------------------------------------------------------------
     // ---------------- Crear ADConverter --------------------------
@@ -182,7 +215,7 @@ int main() {
     auto ADconverter = std::make_shared<ADConverter>(Ts_converter);
     std::shared_ptr<double> ykd(&vars->ykd, [](double*){});
     // ADConverter lee vars->yk, escribe vars->ykd
-    Hilo hiloAD(ADconverter, yk, ykd, running.get(), mtx, freq_component, "hiloAD");
+    Hilo hiloAD(ADconverter, yk, ykd, running.get(), mtx, freq_component, SystemConfig::HILO_AD_NAME);
 
     //-------------------------------------------------------------
     // ---------------- Crear PID ----------------------------------
@@ -190,16 +223,16 @@ int main() {
 
     // Inicializar parámetros compartidos con valores por defecto
     pthread_mutex_lock(mtx.get());
-    params->kp = 5.0;
-    params->ki = 3.0;
-    params->kd = 0.7;
-    params->setpoint = 1.0;  // igual a la amplitud del escalón
+    params->kp = SystemConfig::PID_KP;
+    params->ki = SystemConfig::PID_KI;
+    params->kd = SystemConfig::PID_KD;
+    params->setpoint = SystemConfig::PID_SETPOINT;
     pthread_mutex_unlock(mtx.get());
 
     auto pid = std::make_shared<PIDController>(params->kp, params->ki, params->kd, Ts_controller);
     
     // HiloPID lee vars->e, escribe vars->u, actualiza parámetros dinámicamente
-    HiloPID hiloPID(pid.get(), vars.get(), params.get(), freq_controller, "hiloPID");
+    HiloPID hiloPID(pid.get(), vars.get(), params.get(), freq_controller, SystemConfig::HILO_PID_NAME);
 
     //-------------------------------------------------------------
     // ---------------- Crear DAConverter --------------------------
@@ -207,7 +240,7 @@ int main() {
     auto DAconverter = std::make_shared<DAConverter>(Ts_converter);
     std::shared_ptr<double> u(&vars->u, [](double*){});
     // DAConverter lee vars->u, escribe vars->ua
-    Hilo hiloDA(DAconverter, u, ua, running.get(), mtx, freq_component, "hiloDA"); 
+    Hilo hiloDA(DAconverter, u, ua, running.get(), mtx, freq_component, SystemConfig::HILO_DA_NAME); 
   
     //-------------------------------------------------------------
     // ---------------- Crear Sumador ------------------------------
@@ -216,7 +249,7 @@ int main() {
     auto sumador = std::make_shared<Sumador>(Ts_sumador);
     std::shared_ptr<double> e(&vars->e, [](double*){});
     // Sumador lee vars->ref y vars->ykd, escribe vars->e (error = ref - ykd)
-    Hilo2in hiloSumador(sumador, ref, ykd, e, running.get(), mtx, freq_component, "Sumador");
+    Hilo2in hiloSumador(sumador, ref, ykd, e, running.get(), mtx, freq_component, SystemConfig::HILO_SUMADOR_NAME);
 
     //-------------------------------------------------------------
     // -------- Crear transmisor para enviar datos via IPC --------
@@ -230,7 +263,7 @@ int main() {
     std::cout << "Transmisor inicializado correctamente" << std::endl;
 
     // --- Crear hilo de transmisión a frecuencia de comunicación (2 Hz = 500ms) ---
-    HiloTransmisor hiloTransmisor(transmisor, running.get(), mtx, freq_communication);
+    HiloTransmisor hiloTransmisor(transmisor, running.get(), mtx, freq_communication, SystemConfig::HILO_TRANSMISOR_NAME);
     std::cout << "Hilo de transmisión iniciado a " << freq_communication << " Hz (500ms)" << std::endl;
 
     //-------------------------------------------------------------
@@ -245,7 +278,7 @@ int main() {
     std::cout << "Receptor inicializado correctamente" << std::endl;
 
     // --- Crear hilo de recepción a frecuencia de comunicación (2 Hz = 500ms) ---
-    HiloReceptor hiloReceptor(receptor, running.get(), mtx, freq_communication);
+    HiloReceptor hiloReceptor(receptor, running.get(), mtx, freq_communication, SystemConfig::HILO_RECEPTOR_NAME);
     std::cout << "Hilo de recepción iniciado a " << freq_communication << " Hz (500ms)" << std::endl;
 
     //-------------------------------------------------------------
