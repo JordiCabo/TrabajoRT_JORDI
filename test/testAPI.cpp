@@ -26,7 +26,8 @@ int main() {
 	// 4. Ejecutar el bucle principal del sistema durante 100 iteraciones (~5 segundos)
 	//    Esto simula el funcionamiento en tiempo real y muestra la evolución de las variables
 	std::cout << "Ejecutando sistema (100 iteraciones = ~5 segundos)..." << std::endl;
-	ejecutarSistema(lazo, false, 100);
+	//ejecutarSistema(lazo, false, 100); // Ejecutar por 100 iteraciones
+	ejecutarSistema(lazo, true); // Ejecutar indefinidamente hasta detener manualmente
 
 	// 5. Detener todos los hilos y liberar recursos
 	std::cout << "\nDeteniendo sistema..." << std::endl;
